@@ -44,7 +44,9 @@ Traditional agent swarms pass cumulative chat history between agents. In Syntrop
 ### Deterministic URI Scheme
 Every artifact created by an agent is addressed by a globally unique, immutable URI:
 
-$$\text{blackboard://}\{\text{workstream\_id}\}/\{\text{team\_id}\}/\{\text{agent\_id}\}/\{\text{artifact\_name}\}@v\{\text{version}\}$$
+```text
+blackboard://{workstream_id}/{team_id}/{agent_id}/{artifact_name}@v{version}
+```
 
 * **Example**: `blackboard://ws-sprint-104/team-research/sme_research/user_journey@v1`
 
@@ -53,13 +55,15 @@ To prevent rogue mutations or race conditions:
 1. An agent may only write to URIs where `uri.agent_id == caller_agent_id`.
 2. The payload's `artifact.author_id` must match `caller_agent_id`.
 3. Any unauthorized write attempt immediately halts with:
-   $$\text{403 WriteAccessDenied: caller 'sme\_arch' cannot mutate 'sme\_research' namespace}$$
+   ```text
+   403 WriteAccessDenied: caller 'sme_arch' cannot mutate 'sme_research' namespace
+   ```
 
-### $O(1)$ Signal Broadcast Bus
+### O(1) Signal Broadcast Bus
 When an agent publishes an artifact, the Blackboard does **not** broadcast the content payload. Instead, it emits a lightweight `BlackboardSignal` containing only metadata:
 * `uri`, `author_id`, `title`, `version`, `content_hash` (SHA-256), `size_bytes`.
 
-Peer agents listen to the signal bus over `tokio::sync::broadcast` and retrieve the artifact body on-demand, maintaining **$O(1)$ token overhead**.
+Peer agents listen to the signal bus over `tokio::sync::broadcast` and retrieve the artifact body on-demand, maintaining **O(1) token overhead**.
 
 ---
 
@@ -110,7 +114,7 @@ SyntropyOS routes model prompts asymmetrically to optimize throughput, speed, an
 
 ---
 
-## 6. Plan Synthesis (`AgentResult` $\rightarrow$ `TeamPlan`)
+## 6. Plan Synthesis (`AgentResult` → `TeamPlan`)
 
 At the conclusion of a workstream phase, the Team Lead aggregates the discrete `BlackboardArtifact` pointers and compiles them into a structured `TeamPlan`:
 
