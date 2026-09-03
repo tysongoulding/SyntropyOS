@@ -1,0 +1,62 @@
+name: "🐛 Bug Report"
+description: "File a reproducible defect or unexpected behavior in SyntropyOS"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please ensure you are not reporting a security vulnerability here (report vulnerabilities via GitHub Security Advisories or `security@syntropyos.com`).
+  - type: input
+    id: version
+    attributes:
+      label: SyntropyOS Version
+      description: What version of SyntropyOS are you running? (e.g., 0.6.0)
+      placeholder: "0.6.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What platform are you running on?
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple Silicon M1/M2/M3/M4)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (ARM64)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear description of what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Open Workstream Hub
+        2. Click 'Launch 1-Hour Sprint'
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Terminal Output
+      description: Paste relevant logs or console traces (scrub any private keys or personal data).
+      render: shell

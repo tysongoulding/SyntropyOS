@@ -1,0 +1,42 @@
+name: "🚀 Feature / Enhancement Request"
+description: "Suggest a new capability, model provider, or UX enhancement for SyntropyOS"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature proposals should align with SyntropyOS principles: zero-trust Blackboard architecture, asymmetric 90/10 model routing, and native Tauri/Rig.rs performance.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement / Motivation
+      description: Is your feature request related to a problem or limitation?
+      placeholder: "I am frustrated when trying to..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe your proposed feature, workflow, or API changes.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or workarounds you've explored.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Component Area
+      description: Which part of the system does this impact?
+      options:
+        - "Backend Engine (`crates/syntropy-engine`)"
+        - "Core & Blackboard (`crates/syntropy-core`)"
+        - "Tauri Host & Desktop Security (`src-tauri`)"
+        - "Desktop UI & Views (`src/`)"
+        - "Blueprints & Workstreams"
+    validations:
+      required: true

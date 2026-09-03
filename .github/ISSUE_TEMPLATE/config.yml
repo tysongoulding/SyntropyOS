@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "💬 Questions & Discussions"
+    url: "https://github.com/tysongoulding/SyntropyOS/discussions"
+    about: "Ask questions, share ideas, and discuss agent federation workflows."
+  - name: "🔒 Security Vulnerability Report"
+    url: "https://github.com/tysongoulding/SyntropyOS/security/advisories/new"
+    about: "Report security vulnerabilities privately and responsibly."

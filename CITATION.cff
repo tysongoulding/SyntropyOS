@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use SyntropyOS in your research or production systems, please cite it as below."
+title: "SyntropyOS: An Enterprise-Grade Agentic Operating System on Tauri 2.0 and Rig.rs"
+abstract: "A desktop agentic operating system enabling non-technical department managers to deploy, govern, and collaborate with autonomous, 4-tier agent federations using a decoupled, versioned Blackboard Store with zero-trust write ACLs, asymmetric 90/10 model routing, and real-time Full-Time Agent (FTA) ROI valuation."
+authors:
+  - family-names: "Goulding"
+    given-names: "Tyson"
+version: 0.6.0
+date-released: 2026-09-03
+url: "https://github.com/tysongoulding/SyntropyOS"
+repository-code: "https://github.com/tysongoulding/SyntropyOS"
+license: MIT
+keywords:
+  - "autonomous agents"
+  - "blackboard architecture"
+  - "tauri 2.0"
+  - "rig.rs"
+  - "rust"
+  - "multi-agent systems"
+  - "agentic operating system"
