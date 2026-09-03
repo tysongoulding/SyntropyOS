@@ -719,13 +719,10 @@ export function RulesCustomiseTab() {
                 )}
                 {renderSourceTag(selectedRule.source)}
               </div>
-              <p className="text-[11px] text-[#8b949e] leading-snug">
-                {selectedRule.description}
-              </p>
             </div>
 
             <div className="flex items-center space-x-2">
-              {isSelectedCustom ? (
+              {isSelectedCustom && (
                 <>
                   {/* Mode Toggle */}
                   <div className="flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-0.5 space-x-0.5">
@@ -773,13 +770,6 @@ export function RulesCustomiseTab() {
                     <span>Save</span>
                   </button>
                 </>
-              ) : (
-                <button
-                  onClick={() => promptSwitchToCustom(selectedRule.id)}
-                  className="px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-xs font-medium text-white transition hover:border-[#58a6ff]/40"
-                >
-                  Switch to Custom (Editable) Prompt
-                </button>
               )}
             </div>
           </div>
@@ -1006,10 +996,13 @@ export function RulesCustomiseTab() {
                 </div>
                 <button
                   onClick={() => promptSwitchToCustom(selectedRule.id)}
-                  className="px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-xs font-medium text-white transition hover:border-[#58a6ff]/40 active:scale-95"
+                  className="px-4 py-2 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-xs font-medium text-white transition hover:border-[#58a6ff]/40 active:scale-95 shadow-sm"
                 >
                   Switch to Custom (Editable) Prompt
                 </button>
+                <p className="text-xs text-[#8b949e] max-w-md leading-relaxed pt-1">
+                  {selectedRule.description}
+                </p>
               </div>
             ) : editorMode === "edit" ? (
               <textarea
