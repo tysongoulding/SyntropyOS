@@ -519,35 +519,35 @@ export function RulesCustomiseTab() {
   const renderSourceTag = (source: "default" | "custom" | "plugin") => {
     if (source === "default") {
       return (
-        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30 whitespace-nowrap">
+        <span className="text-[8.5px] font-mono px-1.5 py-0 rounded border bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30 leading-tight whitespace-nowrap">
           Default
         </span>
       );
     }
     if (source === "plugin") {
       return (
-        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border bg-purple-500/10 text-purple-300 border-purple-500/30 whitespace-nowrap">
+        <span className="text-[8.5px] font-mono px-1.5 py-0 rounded border bg-purple-500/10 text-purple-300 border-purple-500/30 leading-tight whitespace-nowrap">
           Plugin
         </span>
       );
     }
     return (
-      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border bg-[#f472b6]/10 text-[#f472b6] border-[#f472b6]/30 whitespace-nowrap">
+      <span className="text-[8.5px] font-mono px-1.5 py-0 rounded border bg-[#f472b6]/10 text-[#f472b6] border-[#f472b6]/30 leading-tight whitespace-nowrap">
         Custom
       </span>
     );
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-5 max-w-7xl mx-auto text-xs text-[#c9d1d9]">
+    <div className="flex-1 overflow-y-auto p-4 space-y-3.5 max-w-7xl mx-auto text-xs text-[#c9d1d9]">
       {/* Top Banner */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#30363d]">
+      <div className="flex items-center justify-between pb-2.5 border-b border-[#30363d]">
         <div>
-          <h2 className="text-sm font-semibold text-white mb-1 flex items-center space-x-2">
+          <h2 className="text-sm font-semibold text-white mb-0.5 flex items-center space-x-2">
             <Shield className="w-4 h-4 text-[#58a6ff]" />
             <span>Core Prompts, Layered Rules &amp; Agent Personas</span>
           </h2>
-          <p className="text-[#8b949e]">
+          <p className="text-[#8b949e] text-[11px]">
             Govern SyntropyOS default protocols, custom user rules, and multi-agent persona invariant props.
           </p>
         </div>
@@ -564,11 +564,11 @@ export function RulesCustomiseTab() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5">
         {/* Rule & Agent Selector Sidebar */}
-        <div className="space-y-4 md:col-span-1">
+        <div className="space-y-3 md:col-span-1">
           {ruleCategories.map((group, gIdx) => (
-            <div key={gIdx} className="space-y-1.5">
+            <div key={gIdx} className="space-y-1">
               <div className="flex items-center justify-between px-1">
                 <span className="text-[10px] font-semibold text-[#8b949e] uppercase tracking-wider">
                   {group.groupTitle}
@@ -593,22 +593,22 @@ export function RulesCustomiseTab() {
                     <button
                       key={rule.id}
                       onClick={() => setActiveRuleId(rule.id)}
-                      className={`w-full p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      className={`w-full py-1.5 px-2.5 rounded-lg border text-left transition flex flex-col justify-center ${
                         isSelected
-                          ? "bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 border-[#f472b6]/40 text-white font-medium"
-                          : "bg-[#161b22] border-[#30363d] text-[#8b949e] hover:text-white"
+                          ? "bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 border-[#f472b6]/40 text-white font-medium shadow-sm"
+                          : "bg-[#161b22] border-[#30363d] text-[#8b949e] hover:text-white hover:border-[#484f58]"
                       }`}
                     >
                       {/* Top Row: [Name] [Default/Custom] */}
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-mono text-xs font-semibold truncate text-white mr-2">
+                      <div className="flex items-center justify-between w-full leading-tight">
+                        <span className="font-mono text-[11px] font-semibold truncate text-white mr-2">
                           {rule.name}
                         </span>
                         {renderSourceTag(rule.source)}
                       </div>
 
                       {/* Bottom Row: [Role/Title] [-tokens] */}
-                      <div className="flex items-center justify-between w-full mt-1.5">
+                      <div className="flex items-center justify-between w-full mt-0.5 leading-tight">
                         <span className="text-[9px] text-[#8b949e] truncate mr-2">
                           {"roleDesc" in rule ? (rule as any).roleDesc : rule.file}
                         </span>
@@ -625,9 +625,9 @@ export function RulesCustomiseTab() {
         </div>
 
         {/* Editor & Persona Details Panel */}
-        <div className="md:col-span-3 bg-[#161b22] border border-[#30363d] rounded-2xl p-5 flex flex-col space-y-4 min-h-[550px]">
+        <div className="md:col-span-3 bg-[#161b22] border border-[#30363d] rounded-xl p-3.5 flex flex-col space-y-3 min-h-[500px]">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#30363d] pb-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#30363d] pb-2.5">
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <span className="font-semibold text-white text-xs font-mono">{selectedRule.name}</span>
               <span className="font-mono text-[10px] text-[#8b949e]">({selectedRule.file})</span>
@@ -674,7 +674,7 @@ export function RulesCustomiseTab() {
               <button
                 onClick={handleSave}
                 disabled={savingPrompt}
-                className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs flex items-center space-x-1.5 transition shadow hover:opacity-90 active:scale-95"
+                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs flex items-center space-x-1.5 transition shadow hover:opacity-90 active:scale-95"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save</span>
@@ -684,8 +684,8 @@ export function RulesCustomiseTab() {
 
           {/* Interactive Agent Persona Properties & Invariants Card */}
           {activePersona && (
-            <div className="p-4 bg-[#0d1117] rounded-xl border border-[#30363d] space-y-3">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div className="p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5">
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="font-semibold text-white text-xs">{activePersona.role}</span>
@@ -701,51 +701,51 @@ export function RulesCustomiseTab() {
                       {activePersona.targetModel === "flash" ? "90% Fast Tier (Default)" : "10% Reasoning Lead"}
                     </button>
                   </div>
-                  <p className="text-[11px] text-[#8b949e] mt-0.5">{activePersona.description}</p>
+                  <p className="text-[10.5px] text-[#8b949e] mt-0.5">{activePersona.description}</p>
                 </div>
 
                 {/* Prompt Protection Dual-Mode Selector & Reset Props Button */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1.5">
                   <button
                     onClick={handleResetActivePersonaProps}
-                    className="p-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] text-[#8b949e] hover:text-white transition"
+                    className="p-1 rounded-md bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] text-[#8b949e] hover:text-white transition"
                     title="Reset Persona Props to Default"
                   >
                     <RotateCcw className="w-3 h-3" />
                   </button>
 
-                  <div className="flex items-center space-x-1 bg-[#161b22] border border-[#30363d] p-1 rounded-lg">
+                  <div className="flex items-center space-x-1 bg-[#161b22] border border-[#30363d] p-0.5 rounded-lg">
                     <button
                       onClick={() => handleTogglePromptProtection(false)}
                       disabled={savingPrompt || !promptProtection.is_custom}
-                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[10px] font-mono transition ${
+                      className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono transition ${
                         !promptProtection.is_custom
                           ? "bg-[#58a6ff]/20 text-[#58a6ff] border border-[#58a6ff]/40 font-semibold"
                           : "text-[#8b949e] hover:text-white"
                       }`}
                     >
-                      <Lock className="w-3 h-3" />
-                      <span>Defaulted (Proprietary)</span>
+                      <Lock className="w-2.5 h-2.5" />
+                      <span>Default</span>
                     </button>
                     <button
                       onClick={() => handleTogglePromptProtection(true)}
                       disabled={savingPrompt || promptProtection.is_custom}
-                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[10px] font-mono transition ${
+                      className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono transition ${
                         promptProtection.is_custom
                           ? "bg-[#f472b6]/20 text-[#f472b6] border border-[#f472b6]/40 font-semibold"
                           : "text-[#8b949e] hover:text-white"
                       }`}
                     >
-                      <span>Custom (Editable)</span>
+                      <span>Custom</span>
                     </button>
                   </div>
                 </div>
               </div>
 
               {/* Editable Props Grid */}
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#21262d] text-[11px]">
-                <div className="p-2 rounded-lg bg-[#161b22] border border-[#30363d] space-y-1">
-                  <div className="text-[10px] text-[#8b949e] flex justify-between">
+              <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-[#21262d] text-[11px]">
+                <div className="p-1.5 px-2 rounded-md bg-[#161b22] border border-[#30363d] space-y-0.5">
+                  <div className="text-[9.5px] text-[#8b949e] flex justify-between">
                     <span>Temperature</span>
                     <span className="font-mono text-white">{activePersona.temperature ?? 0.2}</span>
                   </div>
@@ -756,16 +756,16 @@ export function RulesCustomiseTab() {
                     step="0.05"
                     value={activePersona.temperature ?? 0.2}
                     onChange={(e) => updatePersona(activePersona.id, { temperature: parseFloat(e.target.value) })}
-                    className="w-full accent-[#58a6ff] h-1.5 bg-[#0d1117] rounded-lg cursor-pointer"
+                    className="w-full accent-[#58a6ff] h-1 bg-[#0d1117] rounded cursor-pointer"
                   />
                 </div>
 
-                <div className="p-2 rounded-lg bg-[#161b22] border border-[#30363d] space-y-1">
-                  <div className="text-[10px] text-[#8b949e]">Thinking Budget</div>
+                <div className="p-1.5 px-2 rounded-md bg-[#161b22] border border-[#30363d] space-y-0.5">
+                  <div className="text-[9.5px] text-[#8b949e]">Thinking Budget</div>
                   <select
                     value={activePersona.thinkingLevel ?? "high"}
                     onChange={(e) => updatePersona(activePersona.id, { thinkingLevel: e.target.value as any })}
-                    className="w-full bg-[#0d1117] border border-[#30363d] rounded px-1.5 py-0.5 text-white font-mono text-[10px] outline-none"
+                    className="w-full bg-[#0d1117] border border-[#30363d] rounded px-1 py-0.5 text-white font-mono text-[9.5px] outline-none"
                   >
                     <option value="off">Off</option>
                     <option value="low">Low (1k)</option>
@@ -775,12 +775,12 @@ export function RulesCustomiseTab() {
                   </select>
                 </div>
 
-                <div className="p-2 rounded-lg bg-[#161b22] border border-[#30363d] space-y-1">
-                  <div className="text-[10px] text-[#8b949e]">Permission Level</div>
+                <div className="p-1.5 px-2 rounded-md bg-[#161b22] border border-[#30363d] space-y-0.5">
+                  <div className="text-[9.5px] text-[#8b949e]">Permission Level</div>
                   <select
                     value={activePersona.permissionLevel ?? "Sandboxed"}
                     onChange={(e) => updatePersona(activePersona.id, { permissionLevel: e.target.value as any })}
-                    className="w-full bg-[#0d1117] border border-[#30363d] rounded px-1.5 py-0.5 text-white font-mono text-[10px] outline-none"
+                    className="w-full bg-[#0d1117] border border-[#30363d] rounded px-1 py-0.5 text-white font-mono text-[9.5px] outline-none"
                   >
                     <option value="Read-Only">Read-Only</option>
                     <option value="Sandboxed">Sandboxed (Default)</option>
@@ -790,21 +790,21 @@ export function RulesCustomiseTab() {
               </div>
 
               {/* Invariants: Produces vs Prohibits vs Assumes */}
-              <div className="pt-2 border-t border-[#21262d] flex flex-wrap items-center gap-3 text-[10px] font-mono">
-                <div className="flex items-center gap-1.5">
+              <div className="pt-1.5 border-t border-[#21262d] flex flex-wrap items-center gap-2 text-[9.5px] font-mono">
+                <div className="flex items-center gap-1">
                   <span className="text-[#8b949e]">Produces:</span>
                   {(activePersona.invariants?.produces || ["deliverable_spec"]).map((p) => (
-                    <span key={p} className="px-1.5 py-0.5 rounded bg-[#58a6ff]/10 text-[#58a6ff]">
+                    <span key={p} className="px-1.5 py-0.2 rounded bg-[#58a6ff]/10 text-[#58a6ff]">
                       +{p}
                     </span>
                   ))}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <span className="text-[#8b949e]">Prohibits:</span>
                   {(activePersona.invariants?.prohibits || []).length > 0 ? (
                     activePersona.invariants?.prohibits.map((pr) => (
-                      <span key={pr} className="px-1.5 py-0.5 rounded bg-[#f472b6]/10 text-[#f472b6]">
+                      <span key={pr} className="px-1.5 py-0.2 rounded bg-[#f472b6]/10 text-[#f472b6]">
                         !{pr}
                       </span>
                     ))
@@ -813,11 +813,11 @@ export function RulesCustomiseTab() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <span className="text-[#8b949e]">Assumes:</span>
                   {(activePersona.invariants?.assumes || []).length > 0 ? (
                     activePersona.invariants?.assumes.map((a) => (
-                      <span key={a} className="px-1.5 py-0.5 rounded bg-[#21262d] text-[#c9d1d9]">
+                      <span key={a} className="px-1.5 py-0.2 rounded bg-[#21262d] text-[#c9d1d9]">
                         @{a}
                       </span>
                     ))
@@ -831,7 +831,7 @@ export function RulesCustomiseTab() {
 
           {/* Compaction Controls (when COMPACTION.md is active) */}
           {selectedRule.id === "compaction" && (
-            <div className="p-3.5 bg-[#0d1117] rounded-xl border border-[#30363d] space-y-3">
+            <div className="p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Sliders className="w-3.5 h-3.5 text-[#58a6ff]" />
@@ -849,7 +849,7 @@ export function RulesCustomiseTab() {
                 step="5"
                 value={compactingPercent}
                 onChange={(e) => setCompactingPercent(Number(e.target.value))}
-                className="w-full accent-[#58a6ff] bg-[#161b22] rounded-lg h-2 cursor-pointer"
+                className="w-full accent-[#58a6ff] bg-[#161b22] rounded h-1.5 cursor-pointer"
               />
             </div>
           )}
@@ -858,25 +858,25 @@ export function RulesCustomiseTab() {
           <div className="flex-1 flex flex-col min-h-0">
             {activePersona && !promptProtection.is_custom ? (
               /* Defaulted Protected Mode */
-              <div className="flex-1 p-8 rounded-xl bg-[#0d1117] border border-[#30363d] flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-12 h-12 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center text-[#58a6ff]">
-                  <Lock className="w-6 h-6" />
+              <div className="flex-1 p-5 rounded-lg bg-[#0d1117] border border-[#30363d] flex flex-col items-center justify-center text-center space-y-2.5">
+                <div className="w-9 h-9 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center text-[#58a6ff]">
+                  <Lock className="w-4 h-4" />
                 </div>
-                <div className="space-y-1.5 max-w-md">
-                  <h3 className="text-sm font-semibold text-white">[ Defaulted (Proprietary Engine) ]</h3>
-                  <p className="text-xs text-[#8b949e] leading-relaxed">
+                <div className="space-y-1 max-w-sm">
+                  <h3 className="text-xs font-semibold text-white">[ Default (Proprietary Engine) ]</h3>
+                  <p className="text-[11px] text-[#8b949e] leading-relaxed">
                     This agent role uses proprietary system instructions compiled into the native Rust binary.
                     Monitored by Canary UUID tripwires, wrapped in Dynamic Nonces, and memory-scrubbed via Zeroizing.
                   </p>
                 </div>
-                <div className="flex items-center space-x-2 text-[10px] font-mono text-[#58a6ff] bg-[#161b22] px-3 py-1 rounded border border-[#30363d]">
+                <div className="flex items-center space-x-1.5 text-[9.5px] font-mono text-[#58a6ff] bg-[#161b22] px-2.5 py-0.5 rounded border border-[#30363d]">
                   <CheckCircle2 className="w-3 h-3" />
                   <span>3-Vector Defense Active • Opaque from IPC</span>
                 </div>
                 <button
                   onClick={() => handleTogglePromptProtection(true)}
                   disabled={savingPrompt}
-                  className="px-4 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-xs font-medium text-white transition"
+                  className="px-3 py-1 rounded bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[11px] font-medium text-white transition mt-1"
                 >
                   Switch to Custom (Editable) Prompt
                 </button>
