@@ -18,7 +18,8 @@ SyntropyOS/
 ├── src/                        # React 19 + TypeScript + Tailwind CSS desktop UI (Tri-Color theme)
 ├── docs/                       # Modular documentation
 │   ├── FRONTEND.md             # Frontend architecture, components, Zustand stores, styling
-│   └── BACKEND.md              # Rust engine, Rig.rs adapter, Blackboard URI & ACL specifications
+│   ├── BACKEND.md              # Rust engine, Rig.rs adapter, Blackboard URI & ACL specifications
+│   └── ORCHESTRATION.md        # 4-tier federation, Blackboard store, DAG engine, 1-Hour Sprint
 └── SPEC.md                     # Living requirements and task checklist
 ```
 
@@ -93,4 +94,5 @@ npm run build
 For in-depth domain specifics, consult:
 * **[FRONTEND.md](docs/FRONTEND.md)**: React 19 layout, components, Zustand stores, Tailwind tokens, and view routing.
 * **[BACKEND.md](docs/BACKEND.md)**: Tauri 2.0 host, Rig.rs 0.42+ engine integration, Blackboard store specification, and DAG pipeline.
+* **[ORCHESTRATION.md](docs/ORCHESTRATION.md)**: 4-tier federation hierarchy, Blackboard store zero-trust ACLs, O(1) signal bus, and 1-Hour Sprint blueprint.
 * **[SPEC.md](SPEC.md)**: Living backlog, deliverable checklist, and user change tracking.
