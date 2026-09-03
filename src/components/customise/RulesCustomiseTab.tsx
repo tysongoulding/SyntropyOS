@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   Shield,
-  FileText,
   Save,
   Sliders,
   Cpu,
@@ -14,7 +13,6 @@ import {
   Zap,
   Lock,
   Plus,
-  CheckCircle2,
   AlertTriangle,
   X,
   Users,
@@ -98,22 +96,29 @@ Defines execution permissions, background daemons, MCP sidecars, and automated s
 - Use \`schedule\` tool for one-shot timers or recurring cron triggers.
 - Never execute blocking sleep commands in shell.`;
 
-const DEFAULT_GLOBAL_RULES = `# General Instructions
+const DEFAULT_GLOBAL_RULES = `# General Instructions (Chat & Autonomous Agents)
 - Direct Output: Start immediately with the solution, script, or code block.
 - Absolute Brevity: If a single line answers the prompt, provide only that.
 - Target Modifications: Prefer precise, incremental edits over full-file rewrites.
 - Closed Loop Validation: Validate syntax and run checks locally before declaring complete.
 - No Placeholders: Never emit // TODO or left-as-an-exercise placeholders.`;
 
-const DEFAULT_PROJECT_RULES = `# Repository Instructions
+const DEFAULT_PROJECT_RULES = `# Repository Instructions (Project Workspace)
 - Keep files concise (~150 lines target). Treat growth beyond ~150 lines as a signal to check cohesion.
 - Separate unit tests into sibling tests.rs or tests/ submodules.
 - Lint Policy: Do not add Clippy allow, expect, or crate-level lint suppressions.
 - Testing: Use cargo test --workspace for verified feedback.`;
 
-const DEFAULT_COMPANY_RULES = `# Company Compliance & Governance
-- Security: Never commit API keys, cloud secrets, or access tokens.
-- Privacy: Strip internal hostnames, private IPs, and proprietary credentials before git push.`;
+const DEFAULT_WORKSTREAM_RULES = `# SyntropyOS Workstream Execution & Federation Protocol
+
+Universal execution rules enforced across every single active workstream.
+
+## Core Directives
+1. **Blackboard Dual-Plane Synchronization**: All milestone deliverables must be published to the Blackboard Data Plane (JSON) and Presentation Plane (Markdown).
+2. **Deterministic Invariant Validation**: Before phase transitions, verify that produced artifacts satisfy upstream contract invariants (produces vs prohibits).
+3. **Phase-Gate Sequentiality**: Adhere to sequential progression (Understand -> Sketch -> Decide -> Prototype). No phase may be skipped.
+4. **Zero-Trust Author Isolation**: Agents may only mutate namespaces matching their caller agent ID and role assignment.
+5. **Circuit Breakers**: Immediately halt and request human review if reasoning loops or step retries exceed threshold.`;
 
 const DEFAULT_TEAM_RULES = `# Team Workflow & Defect Prevention
 - TDD Discipline: Strict red-to-green verification before declaring task done.
@@ -148,8 +153,8 @@ const SYNTROPY_BUILTIN_AGENT_IDS = [
   "reviewer",
 ];
 
-const STORAGE_KEY = "syntropy_rules_customise_v5";
-const STORAGE_CUSTOM_RULES_KEY = "syntropy_custom_rules_v5";
+const STORAGE_KEY = "syntropy_rules_customise_v6";
+const STORAGE_CUSTOM_RULES_KEY = "syntropy_custom_rules_v6";
 
 interface PromptConfigDto {
   role: string;
@@ -166,6 +171,10 @@ export function RulesCustomiseTab() {
   const [activeRuleId, setActiveRuleId] = useState<string>("system");
   const [editorMode, setEditorMode] = useState<"edit" | "preview">("edit");
   const [compactingPercent, setCompactingPercent] = useState<number>(85);
+
+  // Project and Team scoped selectors
+  const [selectedProject, setSelectedProject] = useState<string>("syntropyos");
+  const [selectedTeam, setSelectedTeam] = useState<string>("architecture");
 
   // Custom rules map (tracks which items have been switched to custom mode)
   const [customRules, setCustomRules] = useState<Record<string, boolean>>(() => {
@@ -232,7 +241,7 @@ export function RulesCustomiseTab() {
       automation: DEFAULT_AUTOMATION_MD,
       global: DEFAULT_GLOBAL_RULES,
       project: DEFAULT_PROJECT_RULES,
-      company: DEFAULT_COMPANY_RULES,
+      workstreams: DEFAULT_WORKSTREAM_RULES,
       team: DEFAULT_TEAM_RULES,
     };
   });
@@ -439,6 +448,7 @@ export function RulesCustomiseTab() {
           icon: Zap,
           file: "crates/syntropy-engine/prompts/SYSTEM.md",
           tokens: 380,
+          description: "Core executive protocol defining direct output, absolute brevity, evidence discovery, and safe execution guardrails.",
           defaultText: DEFAULT_SYSTEM_MD,
           source: (isRuleCustom("system") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
@@ -448,6 +458,7 @@ export function RulesCustomiseTab() {
           icon: Cpu,
           file: "crates/syntropy-engine/prompts/COMPACTION.md",
           tokens: 310,
+          description: "Context limit compression protocol synthesizing 9-section continuation checkpoints when token limits are reached.",
           defaultText: DEFAULT_COMPACTION_MD,
           source: (isRuleCustom("compaction") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
@@ -457,6 +468,7 @@ export function RulesCustomiseTab() {
           icon: Users,
           file: "crates/syntropy-engine/prompts/SUBAGENT_SYSTEM.md",
           tokens: 290,
+          description: "Delegation harness protocol defining subagent workspace isolation (inherit/branch/share) and reactive wakeup signaling.",
           defaultText: DEFAULT_SUBAGENT_SYSTEM_MD,
           source: (isRuleCustom("subagent") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
@@ -466,6 +478,7 @@ export function RulesCustomiseTab() {
           icon: Layers,
           file: "crates/syntropy-engine/prompts/ARTIFACTS.md",
           tokens: 260,
+          description: "Persistent document protocol governing implementation plans, walkthroughs, diagrams, and sandboxed previews.",
           defaultText: DEFAULT_ARTIFACTS_MD,
           source: (isRuleCustom("artifacts") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
@@ -475,6 +488,7 @@ export function RulesCustomiseTab() {
           icon: Route,
           file: "crates/syntropy-engine/prompts/AUTOMATION.md",
           tokens: 280,
+          description: "Execution permission protocol governing tool sandboxing, MCP server sidecars, and background scheduled triggers.",
           defaultText: DEFAULT_AUTOMATION_MD,
           source: (isRuleCustom("automation") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
@@ -489,6 +503,7 @@ export function RulesCustomiseTab() {
           icon: Shield,
           file: "~/.gemini/GEMINI.md",
           tokens: 420,
+          description: "Universal directives applied across everything: both interactive chat sessions and autonomous agents.",
           defaultText: DEFAULT_GLOBAL_RULES,
           source: (isRuleCustom("global") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
@@ -498,24 +513,27 @@ export function RulesCustomiseTab() {
           icon: Shield,
           file: "AGENTS.md",
           tokens: 580,
+          description: "Repository and codebase-specific directives applied to the selected project workspace.",
           defaultText: DEFAULT_PROJECT_RULES,
           source: (isRuleCustom("project") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
-          id: "company",
-          name: "@COMPANY-RULES",
-          icon: Shield,
-          file: "templates/company-rules.md",
-          tokens: 150,
-          defaultText: DEFAULT_COMPANY_RULES,
-          source: (isRuleCustom("company") ? "custom" : "default") as "default" | "custom" | "plugin",
+          id: "workstreams",
+          name: "@WORKSTREAM-RULES",
+          icon: Route,
+          file: "crates/syntropy-core/rules/WORKSTREAM_RULES.md",
+          tokens: 210,
+          description: "Universal orchestration directives that every single active workstream strictly follows.",
+          defaultText: DEFAULT_WORKSTREAM_RULES,
+          source: (isRuleCustom("workstreams") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "team",
           name: "@TEAM-RULES",
-          icon: Shield,
+          icon: Users,
           file: "templates/team-rules.md",
           tokens: 190,
+          description: "Team-level governance and role-specialized directives applied to the selected agent team.",
           defaultText: DEFAULT_TEAM_RULES,
           source: (isRuleCustom("team") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
@@ -538,6 +556,7 @@ export function RulesCustomiseTab() {
           id: p.id,
           name: p.name,
           roleDesc: p.role,
+          description: p.description || p.role,
           icon: Bot,
           file: `crates/syntropy-engine/prompts/proprietary/${p.id}.md`,
           isAgent: true,
@@ -692,12 +711,17 @@ export function RulesCustomiseTab() {
         <div className="md:col-span-3 bg-[#161b22] border border-[#30363d] rounded-xl p-3.5 flex flex-col space-y-3 min-h-[500px]">
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#30363d] pb-2.5">
-            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-              <span className="font-semibold text-white text-xs font-mono">{selectedRule.name}</span>
-              {"roleDesc" in selectedRule && (
-                <span className="font-mono text-[10px] text-[#8b949e]">({(selectedRule as any).roleDesc})</span>
-              )}
-              {renderSourceTag(selectedRule.source)}
+            <div className="space-y-0.5">
+              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                <span className="font-semibold text-white text-xs font-mono">{selectedRule.name}</span>
+                {"roleDesc" in selectedRule && (
+                  <span className="font-mono text-[10px] text-[#8b949e]">({(selectedRule as any).roleDesc})</span>
+                )}
+                {renderSourceTag(selectedRule.source)}
+              </div>
+              <p className="text-[11px] text-[#8b949e] leading-snug">
+                {selectedRule.description}
+              </p>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -760,6 +784,46 @@ export function RulesCustomiseTab() {
             </div>
           </div>
 
+          {/* Project Scoped Selector (When @PROJECT-RULES is active) */}
+          {selectedRule.id === "project" && (
+            <div className="flex items-center justify-between p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d] text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="text-[#8b949e]">Target Project:</span>
+                <select
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  className="bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-white font-mono text-[11px] outline-none"
+                >
+                  <option value="syntropyos">SyntropyOS (Current Workspace)</option>
+                  <option value="syntropy_core">crates/syntropy-core</option>
+                  <option value="syntropy_engine">crates/syntropy-engine</option>
+                  <option value="src_tauri">src-tauri</option>
+                </select>
+              </div>
+              <span className="text-[10px] text-[#58a6ff] font-mono">Individual Project Scope</span>
+            </div>
+          )}
+
+          {/* Team Scoped Selector (When @TEAM-RULES is active) */}
+          {selectedRule.id === "team" && (
+            <div className="flex items-center justify-between p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d] text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="text-[#8b949e]">Target Team:</span>
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-white font-mono text-[11px] outline-none"
+                >
+                  <option value="architecture">Architecture &amp; Distributed Systems Team</option>
+                  <option value="engine">Safe Rust Engine &amp; Execution Swarm</option>
+                  <option value="frontend">React 19 &amp; Desktop Shell Team</option>
+                  <option value="qa_security">Adversarial QA &amp; Security Verification Team</option>
+                </select>
+              </div>
+              <span className="text-[10px] text-[#58a6ff] font-mono">Team-Specific Scope</span>
+            </div>
+          )}
+
           {/* Interactive Agent Persona Properties & Invariants Card (Shown when persona is selected) */}
           {activePersona && (
             <div className="p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-2">
@@ -779,7 +843,6 @@ export function RulesCustomiseTab() {
                       {activePersona.targetModel === "flash" ? "90% Fast Tier (Default)" : "10% Reasoning Lead"}
                     </button>
                   </div>
-                  <p className="text-[10.5px] text-[#8b949e] mt-0.5">{activePersona.description}</p>
                 </div>
 
                 {/* Prompt Protection Dual-Mode Selector & Reset Props Button */}
