@@ -15,6 +15,7 @@ import {
   Lock,
   Plus,
   CheckCircle2,
+  AlertTriangle,
   X,
   Users,
 } from "lucide-react";
@@ -148,6 +149,7 @@ const SYNTROPY_BUILTIN_AGENT_IDS = [
 ];
 
 const STORAGE_KEY = "syntropy_rules_customise_v5";
+const STORAGE_CUSTOM_RULES_KEY = "syntropy_custom_rules_v5";
 
 interface PromptConfigDto {
   role: string;
@@ -164,6 +166,19 @@ export function RulesCustomiseTab() {
   const [activeRuleId, setActiveRuleId] = useState<string>("system");
   const [editorMode, setEditorMode] = useState<"edit" | "preview">("edit");
   const [compactingPercent, setCompactingPercent] = useState<number>(85);
+
+  // Custom rules map (tracks which items have been switched to custom mode)
+  const [customRules, setCustomRules] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_CUSTOM_RULES_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {};
+  });
+
+  // Warning Confirmation Modal for switching to custom editable prompts
+  const [showCustomWarningModal, setShowCustomWarningModal] = useState(false);
+  const [pendingCustomRuleId, setPendingCustomRuleId] = useState<string | null>(null);
 
   // Prompt Protection state for active agent
   const [promptProtection, setPromptProtection] = useState<PromptConfigDto>({
@@ -225,6 +240,15 @@ export function RulesCustomiseTab() {
   // Check if current selection is an agent persona
   const activePersona = personas.find((p) => p.id === activeRuleId);
 
+  // Helper to determine if a rule/agent is in custom editable mode
+  const isRuleCustom = (id: string): boolean => {
+    const p = personas.find((x) => x.id === id);
+    if (p) {
+      return p.promptProtectionMode === "Custom" || Boolean(customRules[id]);
+    }
+    return Boolean(customRules[id]);
+  };
+
   // Load Prompt Protection config whenever an agent is selected
   useEffect(() => {
     if (activePersona) {
@@ -236,12 +260,14 @@ export function RulesCustomiseTab() {
           setPromptProtection(res);
           if (res.is_custom && res.prompt_content) {
             setPrompts((prev) => ({ ...prev, [activePersona.id]: res.prompt_content }));
+            setCustomRules((prev) => ({ ...prev, [activePersona.id]: true }));
           }
         } catch {
+          const isCustom = activePersona.promptProtectionMode === "Custom" || Boolean(customRules[activePersona.id]);
           setPromptProtection({
             role: activePersona.id,
-            is_custom: activePersona.promptProtectionMode === "Custom",
-            display_status: activePersona.promptProtectionMode || "Defaulted",
+            is_custom: isCustom,
+            display_status: isCustom ? "Custom" : "Defaulted",
             prompt_content: activePersona.systemPrompt,
           });
         }
@@ -250,30 +276,67 @@ export function RulesCustomiseTab() {
     }
   }, [activePersona?.id]);
 
-  const handleTogglePromptProtection = async (toCustom: boolean) => {
-    if (!activePersona) return;
-    setSavingPrompt(true);
+  const promptSwitchToCustom = (ruleId: string) => {
+    setPendingCustomRuleId(ruleId);
+    setShowCustomWarningModal(true);
+  };
+
+  const confirmSwitchToCustom = async () => {
+    if (!pendingCustomRuleId) return;
+    const ruleId = pendingCustomRuleId;
+    const nextCustom = { ...customRules, [ruleId]: true };
+    setCustomRules(nextCustom);
     try {
-      if (toCustom) {
+      localStorage.setItem(STORAGE_CUSTOM_RULES_KEY, JSON.stringify(nextCustom));
+    } catch {}
+
+    const currentPersona = personas.find((p) => p.id === ruleId);
+    if (currentPersona) {
+      setSavingPrompt(true);
+      try {
         const textToActivate =
-          prompts[activePersona.id] ||
-          activePersona.systemPrompt ||
-          `# Custom System Instructions for ${activePersona.name}\n\nSpecify customized domain rules...`;
+          prompts[currentPersona.id] ||
+          currentPersona.systemPrompt ||
+          `# Custom System Instructions for ${currentPersona.name}\n\nSpecify customized domain rules...`;
         await invoke("save_custom_prompt", {
-          role: activePersona.id,
+          role: currentPersona.id,
           content: textToActivate,
           activate: true,
         });
         setPromptProtection({
-          role: activePersona.id,
+          role: currentPersona.id,
           is_custom: true,
           display_status: "Custom",
           prompt_content: textToActivate,
         });
-        setPrompts((prev) => ({ ...prev, [activePersona.id]: textToActivate }));
-        updatePersona(activePersona.id, { promptProtectionMode: "Custom" });
-        addToast(`Switched ${activePersona.name} to Custom (User Editable) mode`, "success");
-      } else {
+        setPrompts((prev) => ({ ...prev, [currentPersona.id]: textToActivate }));
+        updatePersona(currentPersona.id, { promptProtectionMode: "Custom" });
+      } catch (e: any) {
+        addToast(`Error activating custom prompt: ${e}`, "error");
+      } finally {
+        setSavingPrompt(false);
+      }
+    }
+
+    setShowCustomWarningModal(false);
+    setPendingCustomRuleId(null);
+    addToast(`Switched to custom editable mode`, "info");
+  };
+
+  const handleReturnToDefault = async () => {
+    const ruleId = selectedRule.id;
+    const nextCustom = { ...customRules, [ruleId]: false };
+    setCustomRules(nextCustom);
+    try {
+      localStorage.setItem(STORAGE_CUSTOM_RULES_KEY, JSON.stringify(nextCustom));
+    } catch {}
+
+    // Reset prompt content to baseline template
+    setPrompts((prev) => ({ ...prev, [ruleId]: selectedRule.defaultText }));
+
+    if (activePersona && activePersona.id === ruleId) {
+      setSavingPrompt(true);
+      try {
         await invoke("save_custom_prompt", {
           role: activePersona.id,
           content: "",
@@ -286,13 +349,14 @@ export function RulesCustomiseTab() {
           prompt_content: "",
         });
         updatePersona(activePersona.id, { promptProtectionMode: "Defaulted" });
-        addToast(`Reverted ${activePersona.name} to opaque Defaulted (Proprietary) mode`, "success");
+      } catch (e: any) {
+        addToast(`Error returning to default: ${e}`, "error");
+      } finally {
+        setSavingPrompt(false);
       }
-    } catch (e: any) {
-      addToast(`Error toggling prompt mode: ${e}`, "error");
-    } finally {
-      setSavingPrompt(false);
     }
+
+    addToast(`Returned ${selectedRule.name} to default proprietary engine`, "success");
   };
 
   const handleResetActivePersonaProps = () => {
@@ -319,8 +383,7 @@ export function RulesCustomiseTab() {
       invariants: defaultRef.invariants,
     });
 
-    handleTogglePromptProtection(false);
-    addToast(`Reset ${activePersona.name} properties to default`, "info");
+    handleReturnToDefault();
   };
 
   const handleCreateAgent = () => {
@@ -338,7 +401,7 @@ export function RulesCustomiseTab() {
       thinkingLevel: newAgentThinkingLevel || DEFAULT_NEW_AGENT.thinkingLevel,
       permissionLevel: newAgentPermissionLevel || DEFAULT_NEW_AGENT.permissionLevel,
       targetModel: newAgentTier === "fast_tier" ? "flash" : "pro",
-      promptProtectionMode: "Custom",
+      promptProtectionMode: "Defaulted",
       invariants: {
         produces: (newAgentProduces || DEFAULT_NEW_AGENT.produces)
           .split(",")
@@ -377,7 +440,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/SYSTEM.md",
           tokens: 380,
           defaultText: DEFAULT_SYSTEM_MD,
-          source: (prompts["system"] && prompts["system"] !== DEFAULT_SYSTEM_MD ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("system") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "compaction",
@@ -386,7 +449,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/COMPACTION.md",
           tokens: 310,
           defaultText: DEFAULT_COMPACTION_MD,
-          source: (prompts["compaction"] && prompts["compaction"] !== DEFAULT_COMPACTION_MD ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("compaction") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "subagent",
@@ -395,7 +458,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/SUBAGENT_SYSTEM.md",
           tokens: 290,
           defaultText: DEFAULT_SUBAGENT_SYSTEM_MD,
-          source: (prompts["subagent"] && prompts["subagent"] !== DEFAULT_SUBAGENT_SYSTEM_MD ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("subagent") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "artifacts",
@@ -404,7 +467,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/ARTIFACTS.md",
           tokens: 260,
           defaultText: DEFAULT_ARTIFACTS_MD,
-          source: (prompts["artifacts"] && prompts["artifacts"] !== DEFAULT_ARTIFACTS_MD ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("artifacts") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "automation",
@@ -413,7 +476,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/AUTOMATION.md",
           tokens: 280,
           defaultText: DEFAULT_AUTOMATION_MD,
-          source: (prompts["automation"] && prompts["automation"] !== DEFAULT_AUTOMATION_MD ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("automation") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
       ],
     },
@@ -427,7 +490,7 @@ export function RulesCustomiseTab() {
           file: "~/.gemini/GEMINI.md",
           tokens: 420,
           defaultText: DEFAULT_GLOBAL_RULES,
-          source: (prompts["global"] && prompts["global"] !== DEFAULT_GLOBAL_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("global") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "project",
@@ -436,7 +499,7 @@ export function RulesCustomiseTab() {
           file: "AGENTS.md",
           tokens: 580,
           defaultText: DEFAULT_PROJECT_RULES,
-          source: (prompts["project"] && prompts["project"] !== DEFAULT_PROJECT_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("project") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "company",
@@ -445,7 +508,7 @@ export function RulesCustomiseTab() {
           file: "templates/company-rules.md",
           tokens: 150,
           defaultText: DEFAULT_COMPANY_RULES,
-          source: (prompts["company"] && prompts["company"] !== DEFAULT_COMPANY_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("company") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "team",
@@ -454,7 +517,7 @@ export function RulesCustomiseTab() {
           file: "templates/team-rules.md",
           tokens: 190,
           defaultText: DEFAULT_TEAM_RULES,
-          source: (prompts["team"] && prompts["team"] !== DEFAULT_TEAM_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
+          source: (isRuleCustom("team") ? "custom" : "default") as "default" | "custom" | "plugin",
         },
       ],
     },
@@ -463,10 +526,11 @@ export function RulesCustomiseTab() {
       isAgentGroup: true,
       items: personas.map((p) => {
         const isBuiltin = SYNTROPY_BUILTIN_AGENT_IDS.includes(p.id);
+        const customState = isRuleCustom(p.id);
         let src: "default" | "custom" | "plugin" = "default";
         if (p.id.includes("plugin") || (p as any).source === "plugin") {
           src = "plugin";
-        } else if (!isBuiltin || p.promptProtectionMode === "Custom") {
+        } else if (!isBuiltin || customState) {
           src = "custom";
         }
 
@@ -487,6 +551,7 @@ export function RulesCustomiseTab() {
 
   const allItems = ruleCategories.flatMap((g) => g.items);
   const selectedRule = allItems.find((r) => r.id === activeRuleId) || allItems[0];
+  const isSelectedCustom = isRuleCustom(selectedRule.id);
 
   const handleTextChange = (val: string) => {
     setPrompts((prev) => ({ ...prev, [selectedRule.id]: val }));
@@ -498,7 +563,7 @@ export function RulesCustomiseTab() {
   const handleSave = async () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
-      if (activePersona && promptProtection.is_custom) {
+      if (activePersona && isSelectedCustom) {
         await invoke("save_custom_prompt", {
           role: activePersona.id,
           content: prompts[selectedRule.id] || "",
@@ -509,11 +574,6 @@ export function RulesCustomiseTab() {
     } catch {
       addToast("Failed to save rules", "error");
     }
-  };
-
-  const handleReset = () => {
-    setPrompts((prev) => ({ ...prev, [selectedRule.id]: selectedRule.defaultText }));
-    addToast(`Reset ${selectedRule.name} to template`, "info");
   };
 
   const renderSourceTag = (source: "default" | "custom" | "plugin") => {
@@ -635,54 +695,66 @@ export function RulesCustomiseTab() {
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Mode Toggle */}
-              <div className="flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-0.5 space-x-0.5">
-                <button
-                  onClick={() => setEditorMode("edit")}
-                  className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
-                    editorMode === "edit"
-                      ? "bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white"
-                      : "text-[#8b949e] hover:text-white"
-                  }`}
-                >
-                  <Code2 className="w-3 h-3" />
-                  <span>Editor</span>
-                </button>
-                <button
-                  onClick={() => setEditorMode("preview")}
-                  className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
-                    editorMode === "preview"
-                      ? "bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white"
-                      : "text-[#8b949e] hover:text-white"
-                  }`}
-                >
-                  <Eye className="w-3 h-3" />
-                  <span>MarkView</span>
-                </button>
-              </div>
+              {isSelectedCustom ? (
+                <>
+                  {/* Mode Toggle */}
+                  <div className="flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-0.5 space-x-0.5">
+                    <button
+                      onClick={() => setEditorMode("edit")}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
+                        editorMode === "edit"
+                          ? "bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white"
+                          : "text-[#8b949e] hover:text-white"
+                      }`}
+                    >
+                      <Code2 className="w-3 h-3" />
+                      <span>Editor</span>
+                    </button>
+                    <button
+                      onClick={() => setEditorMode("preview")}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
+                        editorMode === "preview"
+                          ? "bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white"
+                          : "text-[#8b949e] hover:text-white"
+                      }`}
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>MarkView</span>
+                    </button>
+                  </div>
 
-              {/* Reset to Example */}
-              <button
-                onClick={handleReset}
-                className="p-1.5 rounded-lg bg-[#0d1117] hover:bg-[#21262d] text-[#8b949e] hover:text-white border border-[#30363d] transition"
-                title="Reset to default"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
+                  {/* Return to Default Button */}
+                  <button
+                    onClick={handleReturnToDefault}
+                    className="px-2.5 py-1 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-[11px] text-[#8b949e] hover:text-white border border-[#30363d] transition flex items-center space-x-1"
+                    title="Return to default proprietary engine"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Return to Default</span>
+                  </button>
 
-              {/* Save Button */}
-              <button
-                onClick={handleSave}
-                disabled={savingPrompt}
-                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs flex items-center space-x-1.5 transition shadow hover:opacity-90 active:scale-95"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save</span>
-              </button>
+                  {/* Save Button */}
+                  <button
+                    onClick={handleSave}
+                    disabled={savingPrompt}
+                    className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs flex items-center space-x-1.5 transition shadow hover:opacity-90 active:scale-95"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => promptSwitchToCustom(selectedRule.id)}
+                  className="px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-xs font-medium text-white transition hover:border-[#58a6ff]/40"
+                >
+                  Switch to Custom (Editable) Prompt
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Interactive Agent Persona Properties & Invariants Card */}
+          {/* Interactive Agent Persona Properties & Invariants Card (Shown when persona is selected) */}
           {activePersona && (
             <div className="p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-2">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5">
@@ -716,10 +788,10 @@ export function RulesCustomiseTab() {
 
                   <div className="flex items-center space-x-1 bg-[#161b22] border border-[#30363d] p-0.5 rounded-lg">
                     <button
-                      onClick={() => handleTogglePromptProtection(false)}
-                      disabled={savingPrompt || !promptProtection.is_custom}
+                      onClick={handleReturnToDefault}
+                      disabled={!isSelectedCustom}
                       className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono transition ${
-                        !promptProtection.is_custom
+                        !isSelectedCustom
                           ? "bg-[#58a6ff]/20 text-[#58a6ff] border border-[#58a6ff]/40 font-semibold"
                           : "text-[#8b949e] hover:text-white"
                       }`}
@@ -728,10 +800,10 @@ export function RulesCustomiseTab() {
                       <span>Default</span>
                     </button>
                     <button
-                      onClick={() => handleTogglePromptProtection(true)}
-                      disabled={savingPrompt || promptProtection.is_custom}
+                      onClick={() => promptSwitchToCustom(selectedRule.id)}
+                      disabled={isSelectedCustom}
                       className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono transition ${
-                        promptProtection.is_custom
+                        isSelectedCustom
                           ? "bg-[#f472b6]/20 text-[#f472b6] border border-[#f472b6]/40 font-semibold"
                           : "text-[#8b949e] hover:text-white"
                       }`}
@@ -829,8 +901,8 @@ export function RulesCustomiseTab() {
             </div>
           )}
 
-          {/* Compaction Controls (when COMPACTION.md is active) */}
-          {selectedRule.id === "compaction" && (
+          {/* Compaction Controls (when COMPACTION.md is active and custom) */}
+          {selectedRule.id === "compaction" && isSelectedCustom && (
             <div className="p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -854,29 +926,18 @@ export function RulesCustomiseTab() {
             </div>
           )}
 
-          {/* Body: Protected Defaulted View OR Markdown Editor */}
+          {/* Body: Protected Default (Proprietary Engine) View OR Markdown Editor */}
           <div className="flex-1 flex flex-col min-h-0">
-            {activePersona && !promptProtection.is_custom ? (
-              /* Defaulted Protected Mode */
-              <div className="flex-1 p-5 rounded-lg bg-[#0d1117] border border-[#30363d] flex flex-col items-center justify-center text-center space-y-2.5">
-                <div className="w-9 h-9 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center text-[#58a6ff]">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div className="space-y-1 max-w-sm">
-                  <h3 className="text-xs font-semibold text-white">[ Default (Proprietary Engine) ]</h3>
-                  <p className="text-[11px] text-[#8b949e] leading-relaxed">
-                    This agent role uses proprietary system instructions compiled into the native Rust binary.
-                    Monitored by Canary UUID tripwires, wrapped in Dynamic Nonces, and memory-scrubbed via Zeroizing.
-                  </p>
-                </div>
-                <div className="flex items-center space-x-1.5 text-[9.5px] font-mono text-[#58a6ff] bg-[#161b22] px-2.5 py-0.5 rounded border border-[#30363d]">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>3-Vector Defense Active • Opaque from IPC</span>
+            {!isSelectedCustom ? (
+              /* Sleek Minimal Default (Proprietary Engine) View */
+              <div className="flex-1 p-6 rounded-lg bg-[#0d1117] border border-[#30363d] flex flex-col items-center justify-center text-center space-y-3">
+                <div className="flex items-center space-x-2 text-xs font-semibold text-white">
+                  <Lock className="w-3.5 h-3.5 text-[#58a6ff]" />
+                  <span>Default (Proprietary Engine)</span>
                 </div>
                 <button
-                  onClick={() => handleTogglePromptProtection(true)}
-                  disabled={savingPrompt}
-                  className="px-3 py-1 rounded bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[11px] font-medium text-white transition mt-1"
+                  onClick={() => promptSwitchToCustom(selectedRule.id)}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-xs font-medium text-white transition hover:border-[#58a6ff]/40 active:scale-95"
                 >
                   Switch to Custom (Editable) Prompt
                 </button>
@@ -898,6 +959,38 @@ export function RulesCustomiseTab() {
           </div>
         </div>
       </div>
+
+      {/* Warning Confirmation Modal for Switching to Custom Mode */}
+      {showCustomWarningModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#161b22] border border-[#30363d] rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center space-x-2 text-amber-400">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <h3 className="font-semibold text-white text-sm">Warning: Custom Prompt Edit</h3>
+            </div>
+            <p className="text-xs text-[#c9d1d9] leading-relaxed">
+              Warning you&apos;re gonna edit this. This is gonna change how this behaves. If you ever want to go back, you can hit the &quot;Return to Default&quot; button.
+            </p>
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#30363d]">
+              <button
+                onClick={() => {
+                  setShowCustomWarningModal(false);
+                  setPendingCustomRuleId(null);
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-white text-xs transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSwitchToCustom}
+                className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs transition hover:opacity-90 active:scale-95"
+              >
+                Proceed to Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Agent Persona Creation Modal with Full Defaults */}
       {showNewAgentModal && (
