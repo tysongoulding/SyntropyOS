@@ -97,6 +97,27 @@ Defines execution permissions, background daemons, MCP sidecars, and automated s
 - Use \`schedule\` tool for one-shot timers or recurring cron triggers.
 - Never execute blocking sleep commands in shell.`;
 
+const DEFAULT_GLOBAL_RULES = `# General Instructions
+- Direct Output: Start immediately with the solution, script, or code block.
+- Absolute Brevity: If a single line answers the prompt, provide only that.
+- Target Modifications: Prefer precise, incremental edits over full-file rewrites.
+- Closed Loop Validation: Validate syntax and run checks locally before declaring complete.
+- No Placeholders: Never emit // TODO or left-as-an-exercise placeholders.`;
+
+const DEFAULT_PROJECT_RULES = `# Repository Instructions
+- Keep files concise (~150 lines target). Treat growth beyond ~150 lines as a signal to check cohesion.
+- Separate unit tests into sibling tests.rs or tests/ submodules.
+- Lint Policy: Do not add Clippy allow, expect, or crate-level lint suppressions.
+- Testing: Use cargo test --workspace for verified feedback.`;
+
+const DEFAULT_COMPANY_RULES = `# Company Compliance & Governance
+- Security: Never commit API keys, cloud secrets, or access tokens.
+- Privacy: Strip internal hostnames, private IPs, and proprietary credentials before git push.`;
+
+const DEFAULT_TEAM_RULES = `# Team Workflow & Defect Prevention
+- TDD Discipline: Strict red-to-green verification before declaring task done.
+- Defect Catalog: Review known regression classes in memory/defect-catalog.md.`;
+
 const DEFAULT_NEW_AGENT = {
   name: "Security SME",
   id: "security_sme",
@@ -116,6 +137,16 @@ Never emit unencrypted credentials, bypass authorization guards, or leave ports 
 Evaluate solution candidates with trade-off matrices, data-flow diagrams, and clear module contracts.`,
 };
 
+const SYNTROPY_BUILTIN_AGENT_IDS = [
+  "arch_sme",
+  "code_sme",
+  "coordinator",
+  "coder",
+  "architect",
+  "researcher",
+  "reviewer",
+];
+
 const STORAGE_KEY = "syntropy_rules_customise_v5";
 
 interface PromptConfigDto {
@@ -129,7 +160,8 @@ export function RulesCustomiseTab() {
   const { addToast } = useToastStore();
   const { personas, addPersona, updatePersona } = useAgentStore();
 
-  const [activeRuleId, setActiveRuleId] = useState<string>("arch_sme");
+  // Selected rule defaults to first Core Engine prompt: "system"
+  const [activeRuleId, setActiveRuleId] = useState<string>("system");
   const [editorMode, setEditorMode] = useState<"edit" | "preview">("edit");
   const [compactingPercent, setCompactingPercent] = useState<number>(85);
 
@@ -183,23 +215,10 @@ export function RulesCustomiseTab() {
       subagent: DEFAULT_SUBAGENT_SYSTEM_MD,
       artifacts: DEFAULT_ARTIFACTS_MD,
       automation: DEFAULT_AUTOMATION_MD,
-      global: `# General Instructions
-- Direct Output: Start immediately with the solution, script, or code block.
-- Absolute Brevity: If a single line answers the prompt, provide only that.
-- Target Modifications: Prefer precise, incremental edits over full-file rewrites.
-- Closed Loop Validation: Validate syntax and run checks locally before declaring complete.
-- No Placeholders: Never emit // TODO or left-as-an-exercise placeholders.`,
-      project: `# Repository Instructions
-- Keep files concise (~150 lines target). Treat growth beyond ~150 lines as a signal to check cohesion.
-- Separate unit tests into sibling tests.rs or tests/ submodules.
-- Lint Policy: Do not add Clippy allow, expect, or crate-level lint suppressions.
-- Testing: Use cargo test --workspace for verified feedback.`,
-      company: `# Company Compliance & Governance
-- Security: Never commit API keys, cloud secrets, or access tokens.
-- Privacy: Strip internal hostnames, private IPs, and proprietary credentials before git push.`,
-      team: `# Team Workflow & Defect Prevention
-- TDD Discipline: Strict red-to-green verification before declaring task done.
-- Defect Catalog: Review known regression classes in memory/defect-catalog.md.`,
+      global: DEFAULT_GLOBAL_RULES,
+      project: DEFAULT_PROJECT_RULES,
+      company: DEFAULT_COMPANY_RULES,
+      team: DEFAULT_TEAM_RULES,
     };
   });
 
@@ -219,7 +238,6 @@ export function RulesCustomiseTab() {
             setPrompts((prev) => ({ ...prev, [activePersona.id]: res.prompt_content }));
           }
         } catch {
-          // Fallback mock
           setPromptProtection({
             role: activePersona.id,
             is_custom: activePersona.promptProtectionMode === "Custom",
@@ -320,7 +338,7 @@ export function RulesCustomiseTab() {
       thinkingLevel: newAgentThinkingLevel || DEFAULT_NEW_AGENT.thinkingLevel,
       permissionLevel: newAgentPermissionLevel || DEFAULT_NEW_AGENT.permissionLevel,
       targetModel: newAgentTier === "fast_tier" ? "flash" : "pro",
-      promptProtectionMode: "Defaulted",
+      promptProtectionMode: "Custom",
       invariants: {
         produces: (newAgentProduces || DEFAULT_NEW_AGENT.produces)
           .split(",")
@@ -342,25 +360,13 @@ export function RulesCustomiseTab() {
     setActiveRuleId(finalId);
     setShowNewAgentModal(false);
     resetModalToDefaults();
-    addToast(`Agent persona '${newP.name}' created with default props`, "success");
+    addToast(`Agent persona '${newP.name}' created`, "success");
   };
 
+  // Group 1: Core Engine System Prompts (First)
+  // Group 2: Layered Rule Directives (Second)
+  // Group 3: Agent Personas, Roles & Prompts (Third)
   const ruleCategories = [
-    {
-      groupTitle: "Agent Personas, Roles & Prompts",
-      isAgentGroup: true,
-      items: personas.map((p) => ({
-        id: p.id,
-        name: p.name,
-        roleDesc: p.role,
-        icon: Bot,
-        file: `crates/syntropy-engine/prompts/proprietary/${p.id}.md`,
-        isAgent: true,
-        tokens: p.systemPrompt.length > 0 ? Math.round(p.systemPrompt.length / 4) : 400,
-        isCustom: p.promptProtectionMode === "Custom",
-        defaultText: p.systemPrompt,
-      })),
-    },
     {
       groupTitle: "Core Engine System Prompts",
       items: [
@@ -371,6 +377,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/SYSTEM.md",
           tokens: 380,
           defaultText: DEFAULT_SYSTEM_MD,
+          source: (prompts["system"] && prompts["system"] !== DEFAULT_SYSTEM_MD ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "compaction",
@@ -379,6 +386,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/COMPACTION.md",
           tokens: 310,
           defaultText: DEFAULT_COMPACTION_MD,
+          source: (prompts["compaction"] && prompts["compaction"] !== DEFAULT_COMPACTION_MD ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "subagent",
@@ -387,6 +395,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/SUBAGENT_SYSTEM.md",
           tokens: 290,
           defaultText: DEFAULT_SUBAGENT_SYSTEM_MD,
+          source: (prompts["subagent"] && prompts["subagent"] !== DEFAULT_SUBAGENT_SYSTEM_MD ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "artifacts",
@@ -395,6 +404,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/ARTIFACTS.md",
           tokens: 260,
           defaultText: DEFAULT_ARTIFACTS_MD,
+          source: (prompts["artifacts"] && prompts["artifacts"] !== DEFAULT_ARTIFACTS_MD ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "automation",
@@ -403,6 +413,7 @@ export function RulesCustomiseTab() {
           file: "crates/syntropy-engine/prompts/AUTOMATION.md",
           tokens: 280,
           defaultText: DEFAULT_AUTOMATION_MD,
+          source: (prompts["automation"] && prompts["automation"] !== DEFAULT_AUTOMATION_MD ? "custom" : "default") as "default" | "custom" | "plugin",
         },
       ],
     },
@@ -415,7 +426,8 @@ export function RulesCustomiseTab() {
           icon: Shield,
           file: "~/.gemini/GEMINI.md",
           tokens: 420,
-          defaultText: prompts.global,
+          defaultText: DEFAULT_GLOBAL_RULES,
+          source: (prompts["global"] && prompts["global"] !== DEFAULT_GLOBAL_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "project",
@@ -423,7 +435,8 @@ export function RulesCustomiseTab() {
           icon: Shield,
           file: "AGENTS.md",
           tokens: 580,
-          defaultText: prompts.project,
+          defaultText: DEFAULT_PROJECT_RULES,
+          source: (prompts["project"] && prompts["project"] !== DEFAULT_PROJECT_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "company",
@@ -431,7 +444,8 @@ export function RulesCustomiseTab() {
           icon: Shield,
           file: "templates/company-rules.md",
           tokens: 150,
-          defaultText: prompts.company,
+          defaultText: DEFAULT_COMPANY_RULES,
+          source: (prompts["company"] && prompts["company"] !== DEFAULT_COMPANY_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
         },
         {
           id: "team",
@@ -439,9 +453,35 @@ export function RulesCustomiseTab() {
           icon: Shield,
           file: "templates/team-rules.md",
           tokens: 190,
-          defaultText: prompts.team,
+          defaultText: DEFAULT_TEAM_RULES,
+          source: (prompts["team"] && prompts["team"] !== DEFAULT_TEAM_RULES ? "custom" : "default") as "default" | "custom" | "plugin",
         },
       ],
+    },
+    {
+      groupTitle: "Agent Personas, Roles & Prompts",
+      isAgentGroup: true,
+      items: personas.map((p) => {
+        const isBuiltin = SYNTROPY_BUILTIN_AGENT_IDS.includes(p.id);
+        let src: "default" | "custom" | "plugin" = "default";
+        if (p.id.includes("plugin") || (p as any).source === "plugin") {
+          src = "plugin";
+        } else if (!isBuiltin || p.promptProtectionMode === "Custom") {
+          src = "custom";
+        }
+
+        return {
+          id: p.id,
+          name: p.name,
+          roleDesc: p.role,
+          icon: Bot,
+          file: `crates/syntropy-engine/prompts/proprietary/${p.id}.md`,
+          isAgent: true,
+          tokens: p.systemPrompt.length > 0 ? Math.round(p.systemPrompt.length / 4) : 400,
+          source: src,
+          defaultText: p.systemPrompt,
+        };
+      }),
     },
   ];
 
@@ -476,6 +516,28 @@ export function RulesCustomiseTab() {
     addToast(`Reset ${selectedRule.name} to template`, "info");
   };
 
+  const renderSourceTag = (source: "default" | "custom" | "plugin") => {
+    if (source === "default") {
+      return (
+        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30 whitespace-nowrap">
+          Default (De Facto)
+        </span>
+      );
+    }
+    if (source === "plugin") {
+      return (
+        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border bg-purple-500/10 text-purple-300 border-purple-500/30 whitespace-nowrap">
+          Plugin
+        </span>
+      );
+    }
+    return (
+      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border bg-[#f472b6]/10 text-[#f472b6] border-[#f472b6]/30 whitespace-nowrap">
+        Custom
+      </span>
+    );
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-5 space-y-5 max-w-7xl mx-auto text-xs text-[#c9d1d9]">
       {/* Top Banner */}
@@ -483,10 +545,10 @@ export function RulesCustomiseTab() {
         <div>
           <h2 className="text-sm font-semibold text-white mb-1 flex items-center space-x-2">
             <Shield className="w-4 h-4 text-[#58a6ff]" />
-            <span>Agent Personas, System Prompts &amp; Layered Rules</span>
+            <span>Core Prompts, Layered Rules &amp; Agent Personas</span>
           </h2>
           <p className="text-[#8b949e]">
-            Create and govern agent personas, invariant contracts, dual-mode prompt protection, and core execution directives.
+            Govern SyntropyOS default de facto protocols, custom user rules, and multi-agent persona invariant props.
           </p>
         </div>
 
@@ -551,17 +613,7 @@ export function RulesCustomiseTab() {
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {"isAgent" in rule && (
-                          <span
-                            className={`text-[9px] font-mono px-1.5 py-0.2 rounded border ${
-                              (rule as any).isCustom
-                                ? "bg-[#f472b6]/10 text-[#f472b6] border-[#f472b6]/30"
-                                : "bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30"
-                            }`}
-                          >
-                            {(rule as any).isCustom ? "Custom" : "Default"}
-                          </span>
-                        )}
+                        {renderSourceTag(rule.source)}
                         <span className="font-mono text-[9px] text-[#8b949e]">
                           ~{rule.tokens}t
                         </span>
@@ -578,10 +630,11 @@ export function RulesCustomiseTab() {
         <div className="md:col-span-3 bg-[#161b22] border border-[#30363d] rounded-2xl p-5 flex flex-col space-y-4 min-h-[550px]">
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#30363d] pb-3">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <selectedRule.icon className="w-4 h-4 text-[#58a6ff]" />
               <span className="font-semibold text-white text-xs font-mono">{selectedRule.name}</span>
               <span className="font-mono text-[10px] text-[#8b949e]">({selectedRule.file})</span>
+              {renderSourceTag(selectedRule.source)}
             </div>
 
             <div className="flex items-center space-x-2">
