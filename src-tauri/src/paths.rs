@@ -15,6 +15,7 @@ pub struct AppPaths {
     pub app_data_dir: PathBuf,
     pub extensions_dir: PathBuf,
     pub blackboard_dir: PathBuf,
+    pub custom_prompts_dir: PathBuf,
 }
 
 impl AppPaths {
@@ -29,12 +30,14 @@ impl AppPaths {
             let app_data_dir = roaming_data.join("syntrophyOS");
             let extensions_dir = home.join(".syntrophyOS").join("extensions");
             let blackboard_dir = app_data_dir.join("blackboard");
+            let custom_prompts_dir = app_data_dir.join("custom_prompts");
 
             Ok(Self {
                 app_install_dir,
                 app_data_dir,
                 extensions_dir,
                 blackboard_dir,
+                custom_prompts_dir,
             })
         }
 
@@ -45,12 +48,14 @@ impl AppPaths {
             let app_data_dir = home.join("Library").join("Application Support").join("syntrophyOS");
             let extensions_dir = home.join(".syntrophyOS").join("extensions");
             let blackboard_dir = app_data_dir.join("blackboard");
+            let custom_prompts_dir = app_data_dir.join("custom_prompts");
 
             Ok(Self {
                 app_install_dir,
                 app_data_dir,
                 extensions_dir,
                 blackboard_dir,
+                custom_prompts_dir,
             })
         }
 
@@ -63,12 +68,14 @@ impl AppPaths {
             let app_data_dir = config.join("syntrophyOS");
             let extensions_dir = home.join(".syntrophyOS").join("extensions");
             let blackboard_dir = app_data_dir.join("blackboard");
+            let custom_prompts_dir = app_data_dir.join("custom_prompts");
 
             Ok(Self {
                 app_install_dir,
                 app_data_dir,
                 extensions_dir,
                 blackboard_dir,
+                custom_prompts_dir,
             })
         }
     }
@@ -77,6 +84,7 @@ impl AppPaths {
         std::fs::create_dir_all(&self.app_data_dir)?;
         std::fs::create_dir_all(&self.extensions_dir)?;
         std::fs::create_dir_all(&self.blackboard_dir)?;
+        std::fs::create_dir_all(&self.custom_prompts_dir)?;
         Ok(())
     }
 }

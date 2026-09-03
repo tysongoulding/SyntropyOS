@@ -24,6 +24,7 @@ export type CustomiseTab =
   | "tokens"
   | "rules"
   | "personas"
+  | "prompts"
   | "skills"
   | "mcps"
   | "plugins";

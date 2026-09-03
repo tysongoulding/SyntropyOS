@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State, Window};
 
 use crate::paths::AppPaths;
-use crate::protocol::{SystemStatus, WorkstreamCommand, WorkstreamEvent};
+use crate::protocol::{PromptConfigDto, SystemStatus, WorkstreamCommand, WorkstreamEvent};
 use crate::keystore::SecureKeystore;
 use syntropy_core::blackboard::{BlackboardArtifact, BlackboardStore};
 use syntropy_core::blueprints::sprint::OneHourSprintBlueprint;
@@ -262,6 +262,116 @@ pub async fn execute_command(
                 "rating": rating,
                 "cumulative_hours_saved": *lock
             }))
+        }
+
+        WorkstreamCommand::GetPromptConfig { role } => {
+            let config = get_prompt_config(state, role).await?;
+            Ok(serde_json::to_value(&config).map_err(|e| e.to_string())?)
+        }
+
+        WorkstreamCommand::SaveCustomPrompt { role, content, activate } => {
+            save_custom_prompt(state, role, content, activate).await?;
+            Ok(serde_json::json!({ "status": "saved" }))
+        }
+
+        WorkstreamCommand::GetBlackboardManifest { board_id } => {
+            get_blackboard_manifest(state, board_id).await
+        }
+
+        WorkstreamCommand::GetBlackboardPresentation { board_id } => {
+            let md = get_blackboard_presentation(state, board_id).await?;
+            Ok(serde_json::Value::String(md))
+        }
+
+        WorkstreamCommand::VerifyInvariants { board_id } => {
+            verify_invariants(state, board_id).await
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_prompt_config(
+    state: State<'_, AppState>,
+    role: String,
+) -> Result<PromptConfigDto, String> {
+    let custom_path = state.paths.custom_prompts_dir.join(format!("{}.md", role));
+    if custom_path.exists() {
+        let content = tokio::fs::read_to_string(&custom_path)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(PromptConfigDto {
+            role,
+            is_custom: true,
+            display_status: "Custom".to_string(),
+            prompt_content: content,
+        })
+    } else {
+        Ok(PromptConfigDto {
+            role,
+            is_custom: false,
+            display_status: "Defaulted".to_string(),
+            prompt_content: "".to_string(), // NEVER return proprietary prompt text to frontend
+        })
+    }
+}
+
+#[tauri::command]
+pub async fn save_custom_prompt(
+    state: State<'_, AppState>,
+    role: String,
+    content: String,
+    activate: bool,
+) -> Result<(), String> {
+    let custom_path = state.paths.custom_prompts_dir.join(format!("{}.md", role));
+    if activate {
+        tokio::fs::write(&custom_path, &content)
+            .await
+            .map_err(|e| e.to_string())?;
+    } else if custom_path.exists() {
+        let _ = tokio::fs::remove_file(&custom_path).await;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_blackboard_manifest(
+    state: State<'_, AppState>,
+    board_id: String,
+) -> Result<serde_json::Value, String> {
+    match state.blackboard.get_manifest(&board_id).await {
+        Ok(manifest) => Ok(serde_json::to_value(&manifest).map_err(|e| e.to_string())?),
+        Err(_) => {
+            let manifest = syntropy_core::blackboard::BlackboardManifest::new(&board_id);
+            Ok(serde_json::to_value(&manifest).map_err(|e| e.to_string())?)
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_blackboard_presentation(
+    state: State<'_, AppState>,
+    board_id: String,
+) -> Result<String, String> {
+    match state.blackboard.get_presentation_markdown(&board_id).await {
+        Ok(md) => Ok(md),
+        Err(_) => {
+            let manifest = syntropy_core::blackboard::BlackboardManifest::new(&board_id);
+            Ok(manifest.compile_presentation_markdown())
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn verify_invariants(
+    state: State<'_, AppState>,
+    board_id: String,
+) -> Result<serde_json::Value, String> {
+    match state.blackboard.verify_manifest_invariants(&board_id).await {
+        Ok(res) => Ok(serde_json::to_value(&res).map_err(|e| e.to_string())?),
+        Err(_) => {
+            let manifest = syntropy_core::blackboard::BlackboardManifest::new(&board_id);
+            let res = syntropy_core::blackboard::DeterministicInvariantEngine::verify(&manifest);
+            Ok(serde_json::to_value(&res).map_err(|e| e.to_string())?)
         }
     }
 }

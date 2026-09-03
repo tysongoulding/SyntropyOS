@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { Zap, Play, Layers, ShieldCheck, ArrowRight, GitFork, Bot, Users, CheckCircle2 } from "lucide-react";
 import { useWorkstreamStore } from "@/stores/useWorkstreamStore";
 import { invoke } from "@tauri-apps/api/core";
+import { BlackboardDualPlaneViewer } from "../workstreams/BlackboardDualPlaneViewer";
 
 export const WorkstreamsView: React.FC = () => {
   const { workstreams, activeWorkstreamId, setActiveWorkstream, addWorkstream } = useWorkstreamStore();
-  const [activeTab, setActiveTab] = useState<"hub" | "board">("hub");
+  const [activeTab, setActiveTab] = useState<"hub" | "board" | "blackboard">("hub");
   const [launching, setLaunching] = useState(false);
 
   const activeWs =
@@ -117,10 +118,20 @@ export const WorkstreamsView: React.FC = () => {
           >
             Execution Kanban
           </button>
+          <button
+            onClick={() => setActiveTab("blackboard")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition ${
+              activeTab === "blackboard"
+                ? "bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white shadow-sm"
+                : "text-[#8b949e] hover:text-white"
+            }`}
+          >
+            Dual-Plane Blackboard
+          </button>
         </div>
       </div>
 
-      {activeTab === "hub" ? (
+      {activeTab === "hub" && (
         <div className="space-y-6">
           {/* Featured 1-Hour Sprint Card with Gradient Glow */}
           <div className="relative rounded-2xl p-6 bg-[#161b22] border border-[#30363d] overflow-hidden shadow-2xl">
@@ -217,7 +228,9 @@ export const WorkstreamsView: React.FC = () => {
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === "board" && (
         /* Execution Kanban Board */
         <div className="space-y-4">
           <div className="flex items-center justify-between p-3 rounded-xl bg-[#161b22] border border-[#30363d] text-xs">
@@ -314,6 +327,8 @@ export const WorkstreamsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === "blackboard" && <BlackboardDualPlaneViewer />}
     </div>
   );
 };

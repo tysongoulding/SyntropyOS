@@ -29,6 +29,31 @@ pub enum WorkstreamCommand {
         rating: u8,
         hours_saved: f64,
     },
+    GetPromptConfig {
+        role: String,
+    },
+    SaveCustomPrompt {
+        role: String,
+        content: String,
+        activate: bool,
+    },
+    GetBlackboardManifest {
+        board_id: String,
+    },
+    GetBlackboardPresentation {
+        board_id: String,
+    },
+    VerifyInvariants {
+        board_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptConfigDto {
+    pub role: String,
+    pub is_custom: bool,
+    pub display_status: String,
+    pub prompt_content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

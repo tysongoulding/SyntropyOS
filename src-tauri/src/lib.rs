@@ -8,9 +8,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use commands::{
-    close_window, execute_command, minimize_window, open_external_url, open_local_path,
+    close_window, execute_command, get_blackboard_manifest, get_blackboard_presentation,
+    get_prompt_config, minimize_window, open_external_url, open_local_path, save_custom_prompt,
     save_lota_settings, send_rpc_command, start_drag_window, sync_provider_keys,
-    toggle_maximize_window, AppState,
+    toggle_maximize_window, verify_invariants, AppState,
 };
 use keystore::SecureKeystore;
 use paths::AppPaths;
@@ -51,6 +52,11 @@ pub fn run() {
             sync_provider_keys,
             save_lota_settings,
             send_rpc_command,
+            get_prompt_config,
+            save_custom_prompt,
+            get_blackboard_manifest,
+            get_blackboard_presentation,
+            verify_invariants,
         ])
         .run(tauri::generate_context!())
         .expect("error while running syntropyOS desktop application");

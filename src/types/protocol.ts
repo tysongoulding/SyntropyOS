@@ -77,7 +77,36 @@ export type WorkstreamCommand =
       workstream_id: string;
       rating: number;
       hours_saved: number;
+    }
+  | {
+      command: "get_prompt_config";
+      role: string;
+    }
+  | {
+      command: "save_custom_prompt";
+      role: string;
+      content: string;
+      activate: boolean;
+    }
+  | {
+      command: "get_blackboard_manifest";
+      board_id: string;
+    }
+  | {
+      command: "get_blackboard_presentation";
+      board_id: string;
+    }
+  | {
+      command: "verify_invariants";
+      board_id: string;
     };
+
+export interface PromptConfigDto {
+  role: string;
+  is_custom: boolean;
+  display_status: string;
+  prompt_content: string;
+}
 
 export type WorkstreamEvent =
   | {
