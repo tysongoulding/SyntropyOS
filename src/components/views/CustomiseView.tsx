@@ -2,11 +2,10 @@ import { useUiStore, CustomiseTab } from "../../store/uiStore";
 import { StartupTokenUsageTab } from "../customise/StartupTokenUsageTab";
 import { RulesCustomiseTab } from "../customise/RulesCustomiseTab";
 import { AgentInspector } from "../agent/AgentInspector";
-import { PromptProtectionTab } from "../customise/PromptProtectionTab";
 import { SkillsCustomiseTab } from "../customise/SkillsCustomiseTab";
 import { McpsCustomiseTab } from "../customise/McpsCustomiseTab";
 import { PluginsCustomiseTab } from "../customise/PluginsCustomiseTab";
-import { Coins, Shield, Bot, Lock, Zap, PlugZap, ToyBrick } from "lucide-react";
+import { Coins, Shield, Bot, Zap, PlugZap, ToyBrick } from "lucide-react";
 
 export function CustomiseView() {
   const { activeCustomiseTab, setActiveCustomiseTab } = useUiStore();
@@ -20,7 +19,6 @@ export function CustomiseView() {
     { id: "tokens", label: "Token Usage", icon: Coins, badge: "Startup" },
     { id: "rules", label: "Rules", icon: Shield },
     { id: "personas", label: "Chat Personas", icon: Bot },
-    { id: "prompts", label: "Prompt Protection", icon: Lock, badge: "Dual-Mode" },
     { id: "skills", label: "Skills", icon: Zap },
     { id: "mcps", label: "MCPs", icon: PlugZap },
     { id: "plugins", label: "Plugins", icon: ToyBrick },
@@ -64,7 +62,6 @@ export function CustomiseView() {
             <AgentInspector />
           </div>
         )}
-        {activeCustomiseTab === "prompts" && <PromptProtectionTab />}
         {activeCustomiseTab === "skills" && <SkillsCustomiseTab />}
         {activeCustomiseTab === "mcps" && <McpsCustomiseTab />}
         {activeCustomiseTab === "plugins" && <PluginsCustomiseTab />}

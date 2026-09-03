@@ -43,6 +43,14 @@ export interface AgentPersona {
   // Style
   tone?: "Expert" | "Concise" | "Direct" | "Formal" | "Operational";
   formattingRules?: string;
+
+  // Prompt Protection & Invariants
+  promptProtectionMode?: "Defaulted" | "Custom";
+  invariants?: {
+    produces: string[];
+    prohibits: string[];
+    assumes: string[];
+  };
 }
 
 export interface ToolDefinition {
@@ -55,6 +63,69 @@ export interface ToolDefinition {
 }
 
 export const DEFAULT_PERSONAS: AgentPersona[] = [
+  {
+    id: "arch_sme",
+    name: "Architecture SME",
+    role: "System Designer & Distributed Architect",
+    description: "Formulates high-performance, safe software architectures and async DAG task topologies.",
+    systemPrompt: "STRICT_INTERNAL_COORDINATOR_RULES: You are an autonomous Architecture Subject Matter Expert in SyntropyOS.",
+    defaultTools: ["read", "search", "fetch"],
+    temperature: 0.2,
+    thinkingLevel: "high",
+    coreDirective: "Enforce zero-trust boundaries, deterministic invariants, and async Tokio DAG task topologies.",
+    targetModel: "pro",
+    permissionLevel: "Read-Only",
+    confidenceThreshold: 95,
+    promptProtectionMode: "Defaulted",
+    invariants: {
+      produces: ["architecture_spec", "dag_topologies"],
+      prohibits: ["unencrypted_egress"],
+      assumes: ["business_requirements"],
+    },
+    tone: "Formal",
+  },
+  {
+    id: "code_sme",
+    name: "Code SME",
+    role: "Full-Stack Safe Rust & TS Engineer",
+    description: "Implements clean, memory-safe, zero-warning Rust crates and React components.",
+    systemPrompt: "STRICT_INTERNAL_COORDINATOR_RULES: You are an autonomous Code Subject Matter Expert in SyntropyOS.",
+    defaultTools: ["read", "write", "edit", "bash"],
+    temperature: 0.1,
+    thinkingLevel: "high",
+    coreDirective: "Deliver production-grade, tested, compile-clean code with zero placeholders.",
+    targetModel: "pro",
+    permissionLevel: "Sandboxed",
+    confidenceThreshold: 95,
+    promptProtectionMode: "Defaulted",
+    invariants: {
+      produces: ["rust_code", "test_suites"],
+      prohibits: ["unsafe_blocks"],
+      assumes: ["architecture_spec"],
+    },
+    tone: "Direct",
+  },
+  {
+    id: "coordinator",
+    name: "Lead Coordinator",
+    role: "Deterministic Promotion Parser & DAG Lead",
+    description: "Lightweight, deterministic coordinator node that schedules micro-DAGs and validates invariant satisfaction.",
+    systemPrompt: "STRICT_INTERNAL_COORDINATOR_RULES: You are the autonomous Coordinator Lead in SyntropyOS.",
+    defaultTools: ["read", "search"],
+    temperature: 0.0,
+    thinkingLevel: "medium",
+    coreDirective: "Govern multi-agent workstreams and parse Blackboard promotion manifests deterministically.",
+    targetModel: "flash",
+    permissionLevel: "Read-Only",
+    confidenceThreshold: 98,
+    promptProtectionMode: "Defaulted",
+    invariants: {
+      produces: ["team_plan", "promotion_manifest"],
+      prohibits: ["direct_file_edits"],
+      assumes: ["sme_artifacts"],
+    },
+    tone: "Concise",
+  },
   {
     id: "coder",
     name: "Coding Agent",
@@ -143,13 +214,15 @@ interface AgentState {
   tools: ToolDefinition[];
   setActivePersona: (id: string) => void;
   addCustomPersona: (persona: AgentPersona) => void;
+  addPersona: (persona: AgentPersona) => void;
+  updatePersona: (id: string, updates: Partial<AgentPersona>) => void;
   deleteCustomPersona: (id: string) => void;
   toggleTool: (name: string) => void;
   toggleToolApproval: (name: string) => void;
   addMcpTool: (tool: ToolDefinition) => void;
 }
 
-const STORAGE_KEY = "rho-lota-custom-agents";
+const STORAGE_KEY = "syntropy_custom_agents_v4";
 
 function loadCustomAgents(): AgentPersona[] {
   if (typeof window === "undefined") return DEFAULT_PERSONAS;
@@ -166,7 +239,7 @@ function loadCustomAgents(): AgentPersona[] {
 }
 
 export const useAgentStore = create<AgentState>((set) => ({
-  activePersonaId: "coder",
+  activePersonaId: "arch_sme",
   personas: loadCustomAgents(),
   tools: BUILTIN_TOOLS,
 
@@ -180,6 +253,27 @@ export const useAgentStore = create<AgentState>((set) => ({
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch {}
       return { personas: updated, activePersonaId: persona.id };
+    });
+  },
+
+  addPersona: (persona: AgentPersona) => {
+    set((state) => {
+      const existing = state.personas.filter((p) => p.id !== persona.id);
+      const updated = [...existing, persona];
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return { personas: updated, activePersonaId: persona.id };
+    });
+  },
+
+  updatePersona: (id: string, updates: Partial<AgentPersona>) => {
+    set((state) => {
+      const updated = state.personas.map((p) => (p.id === id ? { ...p, ...updates } : p));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return { personas: updated };
     });
   },
 
