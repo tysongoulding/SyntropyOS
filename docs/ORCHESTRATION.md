@@ -4,7 +4,7 @@ The **Orchestration Plane** (or *Agent Federation Fabric*) is the cognitive oper
 
 ---
 
-## 🏛️ 1. The 4-Tier Federation Hierarchy
+## 1. The 4-Tier Federation Hierarchy
 
 SyntropyOS enforces a strict, top-down governance topology:
 
@@ -37,7 +37,7 @@ SyntropyOS enforces a strict, top-down governance topology:
 
 ---
 
-## 📋 2. The Decoupled Blackboard Store
+## 2. The Decoupled Blackboard Store
 
 Traditional agent swarms pass cumulative chat history between agents. In SyntropyOS, **agents never see raw peer chat history**. Instead, all collaboration is mediated via the **Blackboard Store**.
 
@@ -63,7 +63,7 @@ Peer agents listen to the signal bus over `tokio::sync::broadcast` and retrieve 
 
 ---
 
-## ⚡ 3. The Flagship 1-Hour Agentic Sprint Blueprint
+## 3. The Flagship 1-Hour Agentic Sprint Blueprint
 
 The flagship blueprint is a rigid 60-minute SLA divided into 4 sequential 15-minute phases:
 
@@ -76,7 +76,7 @@ The flagship blueprint is a rigid 60-minute SLA divided into 4 sequential 15-min
 
 ---
 
-## 📊 4. Task DAG Engine & Cycle Detection
+## 4. Task DAG Engine & Cycle Detection
 
 Workstream task dependencies are represented as a Directed Acyclic Graph (DAG):
 
@@ -95,7 +95,7 @@ let execution_order = dag.topological_sort()?;
 
 ---
 
-## 🔀 5. 90/10 Asymmetric Model Routing
+## 5. 90/10 Asymmetric Model Routing
 
 SyntropyOS routes model prompts asymmetrically to optimize throughput, speed, and cost:
 
@@ -110,7 +110,7 @@ SyntropyOS routes model prompts asymmetrically to optimize throughput, speed, an
 
 ---
 
-## 🔄 6. Plan Synthesis (`AgentResult` $\rightarrow$ `TeamPlan`)
+## 6. Plan Synthesis (`AgentResult` $\rightarrow$ `TeamPlan`)
 
 At the conclusion of a workstream phase, the Team Lead aggregates the discrete `BlackboardArtifact` pointers and compiles them into a structured `TeamPlan`:
 
