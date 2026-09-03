@@ -520,7 +520,7 @@ export function RulesCustomiseTab() {
     if (source === "default") {
       return (
         <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border bg-[#58a6ff]/10 text-[#58a6ff] border-[#58a6ff]/30 whitespace-nowrap">
-          Default (De Facto)
+          Default
         </span>
       );
     }
@@ -548,7 +548,7 @@ export function RulesCustomiseTab() {
             <span>Core Prompts, Layered Rules &amp; Agent Personas</span>
           </h2>
           <p className="text-[#8b949e]">
-            Govern SyntropyOS default de facto protocols, custom user rules, and multi-agent persona invariant props.
+            Govern SyntropyOS default protocols, custom user rules, and multi-agent persona invariant props.
           </p>
         </div>
 
@@ -589,33 +589,31 @@ export function RulesCustomiseTab() {
               <div className="space-y-1">
                 {group.items.map((rule) => {
                   const isSelected = activeRuleId === rule.id;
-                  const Icon = rule.icon;
                   return (
                     <button
                       key={rule.id}
                       onClick={() => setActiveRuleId(rule.id)}
-                      className={`w-full p-2.5 rounded-xl border text-left transition flex items-center justify-between ${
+                      className={`w-full p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
                         isSelected
                           ? "bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 border-[#f472b6]/40 text-white font-medium"
                           : "bg-[#161b22] border-[#30363d] text-[#8b949e] hover:text-white"
                       }`}
                     >
-                      <div className="flex items-center space-x-2 truncate mr-2">
-                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? "text-[#58a6ff]" : "text-[#8b949e]"}`} />
-                        <div className="truncate">
-                          <div className="font-mono text-xs font-semibold truncate text-white">
-                            {rule.name}
-                          </div>
-                          <div className="text-[9px] text-[#8b949e] truncate">
-                            {"roleDesc" in rule ? (rule as any).roleDesc : rule.file}
-                          </div>
-                        </div>
+                      {/* Top Row: [Name] [Default/Custom] */}
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-mono text-xs font-semibold truncate text-white mr-2">
+                          {rule.name}
+                        </span>
+                        {renderSourceTag(rule.source)}
                       </div>
 
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {renderSourceTag(rule.source)}
-                        <span className="font-mono text-[9px] text-[#8b949e]">
-                          ~{rule.tokens}t
+                      {/* Bottom Row: [Role/Title] [-tokens] */}
+                      <div className="flex items-center justify-between w-full mt-1.5">
+                        <span className="text-[9px] text-[#8b949e] truncate mr-2">
+                          {"roleDesc" in rule ? (rule as any).roleDesc : rule.file}
+                        </span>
+                        <span className="font-mono text-[9px] text-[#8b949e] flex-shrink-0">
+                          -{rule.tokens}t
                         </span>
                       </div>
                     </button>
@@ -631,7 +629,6 @@ export function RulesCustomiseTab() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#30363d] pb-3">
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-              <selectedRule.icon className="w-4 h-4 text-[#58a6ff]" />
               <span className="font-semibold text-white text-xs font-mono">{selectedRule.name}</span>
               <span className="font-mono text-[10px] text-[#8b949e]">({selectedRule.file})</span>
               {renderSourceTag(selectedRule.source)}
