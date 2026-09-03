@@ -147,6 +147,12 @@ export const DEFAULT_PERSONAS: AgentPersona[] = [
     teamRules: true,
     patternType: "ReAct",
     tone: "Direct",
+    promptProtectionMode: "Defaulted",
+    invariants: {
+      produces: ["rust_code", "test_suites"],
+      prohibits: ["unsafe_blocks"],
+      assumes: ["architecture_spec"],
+    },
   },
   {
     id: "architect",
@@ -164,6 +170,12 @@ export const DEFAULT_PERSONAS: AgentPersona[] = [
     maxTokens: 8000,
     patternType: "Planning",
     tone: "Formal",
+    promptProtectionMode: "Defaulted",
+    invariants: {
+      produces: ["architecture_spec", "module_boundaries"],
+      prohibits: ["tight_coupling"],
+      assumes: ["product_brief"],
+    },
   },
   {
     id: "researcher",
@@ -180,6 +192,12 @@ export const DEFAULT_PERSONAS: AgentPersona[] = [
     confidenceThreshold: 85,
     patternType: "Reflection",
     tone: "Expert",
+    promptProtectionMode: "Defaulted",
+    invariants: {
+      produces: ["research_findings", "dependency_map"],
+      prohibits: ["uncited_claims"],
+      assumes: ["query_context"],
+    },
   },
   {
     id: "reviewer",
@@ -196,6 +214,12 @@ export const DEFAULT_PERSONAS: AgentPersona[] = [
     confidenceThreshold: 95,
     patternType: "Reflection",
     tone: "Concise",
+    promptProtectionMode: "Defaulted",
+    invariants: {
+      produces: ["review_verdict", "regression_matrix"],
+      prohibits: ["unverified_diffs"],
+      assumes: ["test_results"],
+    },
   },
 ];
 

@@ -5,7 +5,6 @@ import {
   Save,
   Sliders,
   Cpu,
-  Sparkles,
   Code2,
   Eye,
   RotateCcw,
@@ -16,13 +15,12 @@ import {
   Lock,
   Plus,
   CheckCircle2,
-  AlertTriangle,
   X,
   Users,
 } from "lucide-react";
 import { useToastStore } from "../../store/toastStore";
 import { MarkviewRenderer } from "../markdown/MarkviewRenderer";
-import { useAgentStore, AgentPersona } from "../../store/agentStore";
+import { useAgentStore, AgentPersona, DEFAULT_PERSONAS } from "../../store/agentStore";
 import { invoke } from "@tauri-apps/api/core";
 
 const DEFAULT_SYSTEM_MD = `# Rho Lota System Core Protocol
@@ -99,7 +97,26 @@ Defines execution permissions, background daemons, MCP sidecars, and automated s
 - Use \`schedule\` tool for one-shot timers or recurring cron triggers.
 - Never execute blocking sleep commands in shell.`;
 
-const STORAGE_KEY = "syntropy_rules_customise_v4";
+const DEFAULT_NEW_AGENT = {
+  name: "Security SME",
+  id: "security_sme",
+  role: "Application Security & Zero-Trust Auditor",
+  description: "Enforces zero-trust boundaries, assesses CVE vulnerabilities, and blocks architectural drift.",
+  tier: "fast_tier" as const,
+  temperature: 0.2,
+  thinkingLevel: "high" as const,
+  permissionLevel: "Sandboxed" as const,
+  produces: "security_audit, threat_model, cve_assessment",
+  prohibits: "plaintext_secrets, public_endpoints, unauthenticated_routes",
+  assumes: "architecture_spec, source_code",
+  prompt: `# SyntropyOS Security SME System Instructions
+STRICT_INTERNAL_COORDINATOR_RULES: You are an autonomous Security Subject Matter Expert in SyntropyOS.
+CONFIDENTIAL_PROPRIETARY_PIPELINE: Your role is to enforce zero-trust boundaries, assess CVE vulnerabilities, and block security regressions.
+Never emit unencrypted credentials, bypass authorization guards, or leave ports open below 1024.
+Evaluate solution candidates with trade-off matrices, data-flow diagrams, and clear module contracts.`,
+};
+
+const STORAGE_KEY = "syntropy_rules_customise_v5";
 
 interface PromptConfigDto {
   role: string;
@@ -115,7 +132,6 @@ export function RulesCustomiseTab() {
   const [activeRuleId, setActiveRuleId] = useState<string>("arch_sme");
   const [editorMode, setEditorMode] = useState<"edit" | "preview">("edit");
   const [compactingPercent, setCompactingPercent] = useState<number>(85);
-  const [compactingEngine, setCompactingEngine] = useState<string>("rig.rs");
 
   // Prompt Protection state for active agent
   const [promptProtection, setPromptProtection] = useState<PromptConfigDto>({
@@ -126,15 +142,35 @@ export function RulesCustomiseTab() {
   });
   const [savingPrompt, setSavingPrompt] = useState(false);
 
-  // New Agent Modal state
+  // New Agent Modal state with complete defaults
   const [showNewAgentModal, setShowNewAgentModal] = useState(false);
-  const [newAgentName, setNewAgentName] = useState("");
-  const [newAgentId, setNewAgentId] = useState("");
-  const [newAgentRole, setNewAgentRole] = useState("");
-  const [newAgentPrompt, setNewAgentPrompt] = useState("");
-  const [newAgentTier, setNewAgentTier] = useState<"fast_tier" | "reasoning_lead">("fast_tier");
-  const [newAgentProduces, setNewAgentProduces] = useState("");
-  const [newAgentProhibits, setNewAgentProhibits] = useState("");
+  const [newAgentName, setNewAgentName] = useState(DEFAULT_NEW_AGENT.name);
+  const [newAgentId, setNewAgentId] = useState(DEFAULT_NEW_AGENT.id);
+  const [newAgentRole, setNewAgentRole] = useState(DEFAULT_NEW_AGENT.role);
+  const [newAgentDescription, setNewAgentDescription] = useState(DEFAULT_NEW_AGENT.description);
+  const [newAgentTier, setNewAgentTier] = useState<"fast_tier" | "reasoning_lead">(DEFAULT_NEW_AGENT.tier);
+  const [newAgentTemperature, setNewAgentTemperature] = useState<number>(DEFAULT_NEW_AGENT.temperature);
+  const [newAgentThinkingLevel, setNewAgentThinkingLevel] = useState<"off" | "low" | "medium" | "high" | "max">(DEFAULT_NEW_AGENT.thinkingLevel);
+  const [newAgentPermissionLevel, setNewAgentPermissionLevel] = useState<"Read-Only" | "Sandboxed" | "Admin">(DEFAULT_NEW_AGENT.permissionLevel);
+  const [newAgentProduces, setNewAgentProduces] = useState(DEFAULT_NEW_AGENT.produces);
+  const [newAgentProhibits, setNewAgentProhibits] = useState(DEFAULT_NEW_AGENT.prohibits);
+  const [newAgentAssumes, setNewAgentAssumes] = useState(DEFAULT_NEW_AGENT.assumes);
+  const [newAgentPrompt, setNewAgentPrompt] = useState(DEFAULT_NEW_AGENT.prompt);
+
+  const resetModalToDefaults = () => {
+    setNewAgentName(DEFAULT_NEW_AGENT.name);
+    setNewAgentId(DEFAULT_NEW_AGENT.id);
+    setNewAgentRole(DEFAULT_NEW_AGENT.role);
+    setNewAgentDescription(DEFAULT_NEW_AGENT.description);
+    setNewAgentTier(DEFAULT_NEW_AGENT.tier);
+    setNewAgentTemperature(DEFAULT_NEW_AGENT.temperature);
+    setNewAgentThinkingLevel(DEFAULT_NEW_AGENT.thinkingLevel);
+    setNewAgentPermissionLevel(DEFAULT_NEW_AGENT.permissionLevel);
+    setNewAgentProduces(DEFAULT_NEW_AGENT.produces);
+    setNewAgentProhibits(DEFAULT_NEW_AGENT.prohibits);
+    setNewAgentAssumes(DEFAULT_NEW_AGENT.assumes);
+    setNewAgentPrompt(DEFAULT_NEW_AGENT.prompt);
+  };
 
   const [prompts, setPrompts] = useState<{ [key: string]: string }>(() => {
     try {
@@ -203,6 +239,7 @@ export function RulesCustomiseTab() {
       if (toCustom) {
         const textToActivate =
           prompts[activePersona.id] ||
+          activePersona.systemPrompt ||
           `# Custom System Instructions for ${activePersona.name}\n\nSpecify customized domain rules...`;
         await invoke("save_custom_prompt", {
           role: activePersona.id,
@@ -240,41 +277,72 @@ export function RulesCustomiseTab() {
     }
   };
 
-  const handleCreateAgent = () => {
-    if (!newAgentName.trim() || !newAgentId.trim()) {
-      addToast("Please specify both an Agent Name and ID", "error");
-      return;
-    }
-
-    const cleanId = newAgentId.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
-    const newP: AgentPersona = {
-      id: cleanId,
-      name: newAgentName,
-      role: newAgentRole || "Domain Specialist",
-      description: "Custom user-defined agent persona with specialized instructions and props.",
-      systemPrompt: newAgentPrompt || `# System Instructions for ${newAgentName}\n\nDeliver robust, tested outputs.`,
-      defaultTools: ["read", "write", "search"],
+  const handleResetActivePersonaProps = () => {
+    if (!activePersona) return;
+    const defaultRef = DEFAULT_PERSONAS.find((p) => p.id === activePersona.id) || {
       temperature: 0.2,
-      thinkingLevel: "medium",
-      promptProtectionMode: "Custom",
+      thinkingLevel: "high" as const,
+      permissionLevel: "Sandboxed" as const,
+      targetModel: "pro",
+      promptProtectionMode: "Defaulted" as const,
       invariants: {
-        produces: newAgentProduces.split(",").map((s) => s.trim()).filter(Boolean),
-        prohibits: newAgentProhibits.split(",").map((s) => s.trim()).filter(Boolean),
+        produces: ["deliverable_spec"],
+        prohibits: [],
         assumes: [],
       },
     };
 
+    updatePersona(activePersona.id, {
+      temperature: defaultRef.temperature,
+      thinkingLevel: defaultRef.thinkingLevel,
+      permissionLevel: defaultRef.permissionLevel,
+      targetModel: defaultRef.targetModel,
+      promptProtectionMode: defaultRef.promptProtectionMode,
+      invariants: defaultRef.invariants,
+    });
+
+    handleTogglePromptProtection(false);
+    addToast(`Reset ${activePersona.name} properties to default`, "info");
+  };
+
+  const handleCreateAgent = () => {
+    const finalName = newAgentName.trim() || DEFAULT_NEW_AGENT.name;
+    const finalId = (newAgentId.trim() || DEFAULT_NEW_AGENT.id).toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+
+    const newP: AgentPersona = {
+      id: finalId,
+      name: finalName,
+      role: newAgentRole.trim() || DEFAULT_NEW_AGENT.role,
+      description: newAgentDescription.trim() || DEFAULT_NEW_AGENT.description,
+      systemPrompt: newAgentPrompt.trim() || DEFAULT_NEW_AGENT.prompt,
+      defaultTools: ["read", "write", "search"],
+      temperature: newAgentTemperature ?? DEFAULT_NEW_AGENT.temperature,
+      thinkingLevel: newAgentThinkingLevel || DEFAULT_NEW_AGENT.thinkingLevel,
+      permissionLevel: newAgentPermissionLevel || DEFAULT_NEW_AGENT.permissionLevel,
+      targetModel: newAgentTier === "fast_tier" ? "flash" : "pro",
+      promptProtectionMode: "Defaulted",
+      invariants: {
+        produces: (newAgentProduces || DEFAULT_NEW_AGENT.produces)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        prohibits: (newAgentProhibits || DEFAULT_NEW_AGENT.prohibits)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        assumes: (newAgentAssumes || DEFAULT_NEW_AGENT.assumes)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      },
+    };
+
     addPersona(newP);
-    setPrompts((prev) => ({ ...prev, [cleanId]: newP.systemPrompt }));
-    setActiveRuleId(cleanId);
+    setPrompts((prev) => ({ ...prev, [finalId]: newP.systemPrompt }));
+    setActiveRuleId(finalId);
     setShowNewAgentModal(false);
-    setNewAgentName("");
-    setNewAgentId("");
-    setNewAgentRole("");
-    setNewAgentPrompt("");
-    setNewAgentProduces("");
-    setNewAgentProhibits("");
-    addToast(`Agent persona '${newP.name}' created successfully`, "success");
+    resetModalToDefaults();
+    addToast(`Agent persona '${newP.name}' created with default props`, "success");
   };
 
   const ruleCategories = [
@@ -423,7 +491,10 @@ export function RulesCustomiseTab() {
         </div>
 
         <button
-          onClick={() => setShowNewAgentModal(true)}
+          onClick={() => {
+            resetModalToDefaults();
+            setShowNewAgentModal(true);
+          }}
           className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs flex items-center space-x-1.5 transition hover:opacity-90 shadow"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -442,7 +513,10 @@ export function RulesCustomiseTab() {
                 </span>
                 {group.isAgentGroup && (
                   <button
-                    onClick={() => setShowNewAgentModal(true)}
+                    onClick={() => {
+                      resetModalToDefaults();
+                      setShowNewAgentModal(true);
+                    }}
                     className="text-[10px] text-[#58a6ff] hover:text-white flex items-center gap-0.5"
                   >
                     <Plus className="w-3 h-3" /> Add
@@ -558,22 +632,38 @@ export function RulesCustomiseTab() {
             </div>
           </div>
 
-          {/* Agent Persona Properties & Invariants Card (When an agent persona is selected) */}
+          {/* Interactive Agent Persona Properties & Invariants Card */}
           {activePersona && (
             <div className="p-4 bg-[#0d1117] rounded-xl border border-[#30363d] space-y-3">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="font-semibold text-white text-xs">{activePersona.role}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161b22] text-[#58a6ff] border border-[#30363d]">
-                      {activePersona.targetModel === "flash" ? "90% Fast Tier" : "10% Reasoning Lead"}
-                    </span>
+                    <button
+                      onClick={() => {
+                        const newTier = activePersona.targetModel === "flash" ? "pro" : "flash";
+                        updatePersona(activePersona.id, { targetModel: newTier });
+                        addToast(`Model Tier updated to ${newTier === "flash" ? "90% Fast Tier" : "10% Reasoning Lead"}`, "success");
+                      }}
+                      className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161b22] text-[#58a6ff] border border-[#30363d] hover:border-[#58a6ff]/40 cursor-pointer transition"
+                      title="Click to toggle Model Tier"
+                    >
+                      {activePersona.targetModel === "flash" ? "90% Fast Tier (Default)" : "10% Reasoning Lead"}
+                    </button>
                   </div>
                   <p className="text-[11px] text-[#8b949e] mt-0.5">{activePersona.description}</p>
                 </div>
 
-                {/* Prompt Protection Dual-Mode Selector */}
+                {/* Prompt Protection Dual-Mode Selector & Reset Props Button */}
                 <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleResetActivePersonaProps}
+                    className="p-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] text-[#8b949e] hover:text-white transition"
+                    title="Reset Persona Props to Default"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                  </button>
+
                   <div className="flex items-center space-x-1 bg-[#161b22] border border-[#30363d] p-1 rounded-lg">
                     <button
                       onClick={() => handleTogglePromptProtection(false)}
@@ -599,6 +689,53 @@ export function RulesCustomiseTab() {
                       <span>Custom (Editable)</span>
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Editable Props Grid */}
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#21262d] text-[11px]">
+                <div className="p-2 rounded-lg bg-[#161b22] border border-[#30363d] space-y-1">
+                  <div className="text-[10px] text-[#8b949e] flex justify-between">
+                    <span>Temperature</span>
+                    <span className="font-mono text-white">{activePersona.temperature ?? 0.2}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={activePersona.temperature ?? 0.2}
+                    onChange={(e) => updatePersona(activePersona.id, { temperature: parseFloat(e.target.value) })}
+                    className="w-full accent-[#58a6ff] h-1.5 bg-[#0d1117] rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                <div className="p-2 rounded-lg bg-[#161b22] border border-[#30363d] space-y-1">
+                  <div className="text-[10px] text-[#8b949e]">Thinking Budget</div>
+                  <select
+                    value={activePersona.thinkingLevel ?? "high"}
+                    onChange={(e) => updatePersona(activePersona.id, { thinkingLevel: e.target.value as any })}
+                    className="w-full bg-[#0d1117] border border-[#30363d] rounded px-1.5 py-0.5 text-white font-mono text-[10px] outline-none"
+                  >
+                    <option value="off">Off</option>
+                    <option value="low">Low (1k)</option>
+                    <option value="medium">Medium (4k)</option>
+                    <option value="high">High (16k • Default)</option>
+                    <option value="max">Max (32k)</option>
+                  </select>
+                </div>
+
+                <div className="p-2 rounded-lg bg-[#161b22] border border-[#30363d] space-y-1">
+                  <div className="text-[10px] text-[#8b949e]">Permission Level</div>
+                  <select
+                    value={activePersona.permissionLevel ?? "Sandboxed"}
+                    onChange={(e) => updatePersona(activePersona.id, { permissionLevel: e.target.value as any })}
+                    className="w-full bg-[#0d1117] border border-[#30363d] rounded px-1.5 py-0.5 text-white font-mono text-[10px] outline-none"
+                  >
+                    <option value="Read-Only">Read-Only</option>
+                    <option value="Sandboxed">Sandboxed (Default)</option>
+                    <option value="Admin">Admin</option>
+                  </select>
                 </div>
               </div>
 
@@ -651,7 +788,7 @@ export function RulesCustomiseTab() {
                   <span className="font-semibold text-white text-xs">Compaction Trigger Threshold</span>
                 </div>
                 <span className="font-mono text-xs font-bold text-[#58a6ff]">
-                  {compactingPercent}% of Context Window
+                  {compactingPercent}% of Context Window (Default: 85%)
                 </span>
               </div>
 
@@ -712,112 +849,219 @@ export function RulesCustomiseTab() {
         </div>
       </div>
 
-      {/* New Agent Persona Creation Modal */}
+      {/* New Agent Persona Creation Modal with Full Defaults */}
       {showNewAgentModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-[#30363d] rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-[#161b22] border border-[#30363d] rounded-2xl w-full max-w-xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#30363d]">
               <div className="flex items-center space-x-2">
                 <Bot className="w-5 h-5 text-[#58a6ff]" />
                 <h3 className="font-semibold text-white text-sm">Create New Agent Persona &amp; Prompt</h3>
               </div>
-              <button
-                onClick={() => setShowNewAgentModal(false)}
-                className="p-1 rounded-lg text-[#8b949e] hover:text-white hover:bg-[#21262d]"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={resetModalToDefaults}
+                  className="px-2.5 py-1 rounded bg-[#21262d] hover:bg-[#30363d] text-[#8b949e] hover:text-white text-[10px] font-mono border border-[#30363d] transition flex items-center gap-1"
+                  title="Reset all fields to recommended defaults"
+                >
+                  <RotateCcw className="w-3 h-3" /> Reset to Defaults
+                </button>
+                <button
+                  onClick={() => setShowNewAgentModal(false)}
+                  className="p-1 rounded-lg text-[#8b949e] hover:text-white hover:bg-[#21262d]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs max-h-[70vh] overflow-y-auto pr-1">
+              {/* Name & ID */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[#8b949e] block mb-1">Agent Name</label>
+                  <label className="text-[#8b949e] block mb-1">
+                    Agent Name <span className="text-[#58a6ff] font-mono text-[10px]">(Default: Security SME)</span>
+                  </label>
                   <input
                     type="text"
                     value={newAgentName}
                     onChange={(e) => {
                       setNewAgentName(e.target.value);
-                      if (!newAgentId) {
+                      if (newAgentId === DEFAULT_NEW_AGENT.id || !newAgentId) {
                         setNewAgentId(e.target.value.toLowerCase().replace(/\s+/g, "_"));
                       }
                     }}
-                    placeholder="e.g. Database Architect"
+                    placeholder="e.g. Security SME"
                     className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white focus:border-[#58a6ff] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[#8b949e] block mb-1">Role ID (snake_case)</label>
+                  <label className="text-[#8b949e] block mb-1">
+                    Role ID (snake_case) <span className="text-[#58a6ff] font-mono text-[10px]">(Default: security_sme)</span>
+                  </label>
                   <input
                     type="text"
                     value={newAgentId}
                     onChange={(e) => setNewAgentId(e.target.value)}
-                    placeholder="e.g. db_sme"
+                    placeholder="e.g. security_sme"
                     className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white font-mono focus:border-[#58a6ff] outline-none"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-[#8b949e] block mb-1">Role Description / Title</label>
-                <input
-                  type="text"
-                  value={newAgentRole}
-                  onChange={(e) => setNewAgentRole(e.target.value)}
-                  placeholder="e.g. High-throughput PostgreSQL & Redis schema engineer"
-                  className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white focus:border-[#58a6ff] outline-none"
-                />
-              </div>
-
+              {/* Role Title & Description */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[#8b949e] block mb-1">Produces Invariants (comma-sep)</label>
+                  <label className="text-[#8b949e] block mb-1">Role Title</label>
+                  <input
+                    type="text"
+                    value={newAgentRole}
+                    onChange={(e) => setNewAgentRole(e.target.value)}
+                    placeholder="e.g. Application Security & Zero-Trust Auditor"
+                    className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white focus:border-[#58a6ff] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#8b949e] block mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={newAgentDescription}
+                    onChange={(e) => setNewAgentDescription(e.target.value)}
+                    placeholder="e.g. Enforces zero-trust boundaries..."
+                    className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white focus:border-[#58a6ff] outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Execution Props: Tier, Temperature, Thinking, Permissions */}
+              <div className="grid grid-cols-4 gap-2 p-3 bg-[#0d1117] rounded-xl border border-[#30363d]">
+                <div>
+                  <label className="text-[10px] text-[#8b949e] block mb-1">Model Tier</label>
+                  <select
+                    value={newAgentTier}
+                    onChange={(e) => setNewAgentTier(e.target.value as any)}
+                    className="w-full bg-[#161b22] border border-[#30363d] rounded p-1 text-white text-[10px] font-mono outline-none"
+                  >
+                    <option value="fast_tier">90% Fast (Default)</option>
+                    <option value="reasoning_lead">10% Reasoning</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-[#8b949e] block mb-1">Temp ({newAgentTemperature})</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={newAgentTemperature}
+                    onChange={(e) => setNewAgentTemperature(parseFloat(e.target.value))}
+                    className="w-full accent-[#58a6ff] h-1.5 bg-[#161b22] rounded cursor-pointer mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-[#8b949e] block mb-1">Thinking</label>
+                  <select
+                    value={newAgentThinkingLevel}
+                    onChange={(e) => setNewAgentThinkingLevel(e.target.value as any)}
+                    className="w-full bg-[#161b22] border border-[#30363d] rounded p-1 text-white text-[10px] font-mono outline-none"
+                  >
+                    <option value="off">Off</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High (Default)</option>
+                    <option value="max">Max</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-[#8b949e] block mb-1">Permissions</label>
+                  <select
+                    value={newAgentPermissionLevel}
+                    onChange={(e) => setNewAgentPermissionLevel(e.target.value as any)}
+                    className="w-full bg-[#161b22] border border-[#30363d] rounded p-1 text-white text-[10px] font-mono outline-none"
+                  >
+                    <option value="Read-Only">Read-Only</option>
+                    <option value="Sandboxed">Sandboxed (Default)</option>
+                    <option value="Admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Invariant Contracts */}
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[#8b949e] block mb-1">
+                    Produces Invariants <span className="text-[#58a6ff] font-mono text-[10px]">(Default: security_audit, threat_model, cve_assessment)</span>
+                  </label>
                   <input
                     type="text"
                     value={newAgentProduces}
                     onChange={(e) => setNewAgentProduces(e.target.value)}
-                    placeholder="e.g. sql_migrations, db_indexes"
+                    placeholder="e.g. security_audit, threat_model"
                     className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white font-mono text-[11px] focus:border-[#58a6ff] outline-none"
                   />
                 </div>
-                <div>
-                  <label className="text-[#8b949e] block mb-1">Prohibits Invariants (comma-sep)</label>
-                  <input
-                    type="text"
-                    value={newAgentProhibits}
-                    onChange={(e) => setNewAgentProhibits(e.target.value)}
-                    placeholder="e.g. table_drop, unindexed_scans"
-                    className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white font-mono text-[11px] focus:border-[#58a6ff] outline-none"
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[#8b949e] block mb-1">Prohibits Invariants</label>
+                    <input
+                      type="text"
+                      value={newAgentProhibits}
+                      onChange={(e) => setNewAgentProhibits(e.target.value)}
+                      placeholder="e.g. plaintext_secrets, public_endpoints"
+                      className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white font-mono text-[11px] focus:border-[#58a6ff] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#8b949e] block mb-1">Assumes Invariants</label>
+                    <input
+                      type="text"
+                      value={newAgentAssumes}
+                      onChange={(e) => setNewAgentAssumes(e.target.value)}
+                      placeholder="e.g. architecture_spec, source_code"
+                      className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-white font-mono text-[11px] focus:border-[#58a6ff] outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
+              {/* System Prompt */}
               <div>
-                <label className="text-[#8b949e] block mb-1">System Prompt / Instructions</label>
+                <label className="text-[#8b949e] block mb-1">
+                  System Prompt / Instructions <span className="text-[#58a6ff] font-mono text-[10px]">(Pre-populated with default template)</span>
+                </label>
                 <textarea
                   rows={4}
                   value={newAgentPrompt}
                   onChange={(e) => setNewAgentPrompt(e.target.value)}
                   placeholder="# System Instructions&#10;Define behavioral directives..."
-                  className="w-full p-3 rounded-lg bg-[#0d1117] border border-[#30363d] text-white font-mono text-[11px] focus:border-[#58a6ff] outline-none resize-none"
+                  className="w-full p-3 rounded-lg bg-[#0d1117] border border-[#30363d] text-white font-mono text-[11px] focus:border-[#58a6ff] outline-none resize-none leading-relaxed"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#30363d]">
-              <button
-                onClick={() => setShowNewAgentModal(false)}
-                className="px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-white text-xs transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateAgent}
-                className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs flex items-center space-x-1.5 transition hover:opacity-90"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Create Persona &amp; Prompt</span>
-              </button>
+            <div className="flex items-center justify-between pt-3 border-t border-[#30363d]">
+              <span className="text-[10px] text-[#8b949e]">
+                All fields pre-loaded with production defaults.
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowNewAgentModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-white text-xs transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateAgent}
+                  className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white font-semibold text-xs flex items-center space-x-1.5 transition hover:opacity-90 active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Create Persona &amp; Prompt</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
