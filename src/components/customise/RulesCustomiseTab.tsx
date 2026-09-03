@@ -669,10 +669,14 @@ export function RulesCustomiseTab() {
 
                       {/* Bottom Row: [Role/Title] [-tokens] */}
                       <div className="flex items-center justify-between w-full mt-0.5 leading-tight">
-                        <span className="text-[9px] text-[#8b949e] truncate mr-2">
-                          {"roleDesc" in rule ? (rule as any).roleDesc : rule.file}
-                        </span>
-                        <span className="font-mono text-[9px] text-[#8b949e] flex-shrink-0">
+                        {"roleDesc" in rule ? (
+                          <span className="text-[9px] text-[#8b949e] truncate mr-2">
+                            {(rule as any).roleDesc}
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                        <span className="font-mono text-[9px] text-[#8b949e] flex-shrink-0 ml-auto">
                           -{rule.tokens}t
                         </span>
                       </div>
@@ -690,7 +694,9 @@ export function RulesCustomiseTab() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#30363d] pb-2.5">
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <span className="font-semibold text-white text-xs font-mono">{selectedRule.name}</span>
-              <span className="font-mono text-[10px] text-[#8b949e]">({selectedRule.file})</span>
+              {"roleDesc" in selectedRule && (
+                <span className="font-mono text-[10px] text-[#8b949e]">({(selectedRule as any).roleDesc})</span>
+              )}
               {renderSourceTag(selectedRule.source)}
             </div>
 
