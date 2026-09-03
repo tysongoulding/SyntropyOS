@@ -9,7 +9,7 @@
 
 ---
 
-## 🎯 Purpose & Mission
+## Purpose & Mission
 
 Modern agent systems suffer from **conversation context cascading** (where entire prompt transcripts are piped linearly between agents, compounding latency, hallucinations, and token cost) and **groupthink** (where subagents passively agree with earlier agent outputs).
 
@@ -22,11 +22,11 @@ SyntropyOS solves this with an enterprise-first native architecture:
 
 ---
 
-## 📦 Download Compiled Applications
+## Download Compiled Applications
 
 Pre-compiled production binaries for Windows, macOS, and Linux are published on GitHub Releases:
 
-👉 **[Download Latest SyntropyOS Release](https://github.com/tysongoulding/SyntropyOS/releases/latest)**
+**[Download Latest SyntropyOS Release](https://github.com/tysongoulding/SyntropyOS/releases/latest)**
 
 | Platform | Installer Type | Package |
 |---|---|---|
@@ -36,7 +36,7 @@ Pre-compiled production binaries for Windows, macOS, and Linux are published on 
 
 ---
 
-## ⚡ Single-Line Quick Install
+## Single-Line Quick Install
 
 ### Windows (PowerShell)
 ```powershell
