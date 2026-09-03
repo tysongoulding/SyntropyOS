@@ -19,7 +19,8 @@ SyntropyOS/
 ├── docs/                       # Modular documentation
 │   ├── FRONTEND.md             # Frontend architecture, components, Zustand stores, styling
 │   ├── BACKEND.md              # Rust engine, Rig.rs adapter, Blackboard URI & ACL specifications
-│   └── ORCHESTRATION.md        # 4-tier federation, Blackboard store, DAG engine, 1-Hour Sprint
+│   ├── ORCHESTRATION.md        # 4-tier federation, agent-to-agent/team-of-teams, Blackboard store, DAG
+│   └── SPRINTS.md              # 1-Hour Agentic Sprint blueprint, phase gates, SLA execution
 └── SPEC.md                     # Living requirements and task checklist
 ```
 
@@ -99,7 +100,8 @@ All AI agents operating in this repository MUST autonomously read the relevant d
 |---|---|---|
 | **Frontend & UI**: Views, Components, Layout, Styling, Themes, Zustand Stores, Tauri IPC client | [`docs/FRONTEND.md`](docs/FRONTEND.md) | Enforces React 19 patterns, electric tri-color tokens (`#58a6ff`, `#c084fc`, `#f472b6`), and Zustand store registry. |
 | **Backend & Engine**: Tauri 2.0 host, Rust crates, Keystore, Paths, OAuth, Rig.rs providers, Resilience | [`docs/BACKEND.md`](docs/BACKEND.md) | Enforces 100% safe Rust, hardware keystore (`keyring` + `Zeroizing<String>`), `tauri-plugin-opener`, and zero shell injection. |
-| **Orchestration & Federation**: Swarms, Blackboard Store, Write ACLs, Task DAG, Sprints, 90/10 Router | [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) | Enforces 4-tier hierarchy, author write isolation, $O(1)$ signal bus, and 1-Hour Sprint blueprint invariants. |
+| **Orchestration & Federation**: Swarms, Teams, Team-of-Teams, Blackboard Store, Write ACLs, Task DAG, 90/10 Router | [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) | Enforces 4-tier hierarchy, author write isolation, O(1) signal bus, and plan synthesis invariants. |
+| **Agentic Sprints & Blueprints**: 1-Hour Sprint, 4-phase SLA lifecycle, phase transition gates, schemas | [`docs/SPRINTS.md`](docs/SPRINTS.md) | Enforces 4-phase sequential execution (Understand -> Sketch -> Decide -> Prototype) and Blackboard deliverable validation. |
 | **Deliverables & Tasks**: Backlog items, user requirements, status checks, progress tracking | [`SPEC.md`](SPEC.md) | Enforces living checklist rules (`[ ]` user adds, `[x]` AI marks only after 3-gate verification passes). |
 
 > [!IMPORTANT]

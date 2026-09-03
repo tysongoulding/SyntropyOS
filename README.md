@@ -99,4 +99,4 @@ SyntropyOS
 └── src/                        <-- React 19 + Tailwind + Lucide desktop UI, Tri-Color theme, Kanban board
 ```
 
-See [AGENTS.md](AGENTS.md), [ORCHESTRATION.md](docs/ORCHESTRATION.md), [BACKEND.md](docs/BACKEND.md), and [FRONTEND.md](docs/FRONTEND.md) for architectural references and developer guides.
+See [AGENTS.md](AGENTS.md), [ORCHESTRATION.md](docs/ORCHESTRATION.md), [SPRINTS.md](docs/SPRINTS.md), [BACKEND.md](docs/BACKEND.md), and [FRONTEND.md](docs/FRONTEND.md) for architectural references and developer guides.

@@ -1,12 +1,14 @@
-# ORCHESTRATION.md — Agent Federation & Orchestration Guide
+# ORCHESTRATION.md — Federation, Teams & Blackboard Inner Workings
 
-The **Orchestration Plane** (or *Agent Federation Fabric*) is the cognitive operating system of SyntropyOS. It governs how autonomous agent swarms collaborate, communicate, and synthesize plans without suffering from **conversation context cascading** or **groupthink**.
+The **Orchestration Plane** (or *Agent Federation Fabric*) is the cognitive operating system of SyntropyOS. It governs how autonomous agent swarms collaborate, communicate, and synthesize plans across individual agents, teams, and team-of-teams hierarchies without suffering from **conversation context cascading** or **groupthink**.
+
+For temporal phase execution, time-boxed SLAs, and blueprint declarations, see **[SPRINTS.md](SPRINTS.md)**.
 
 ---
 
 ## 1. The 4-Tier Federation Hierarchy
 
-SyntropyOS enforces a strict, top-down governance topology:
+SyntropyOS organizes autonomous execution into four strictly isolated governance tiers:
 
 ```text
 ┌────────────────────────────────────────────────────────┐
@@ -30,19 +32,19 @@ SyntropyOS enforces a strict, top-down governance topology:
 └────────────────────────────────────────────────────────┘
 ```
 
-* **Federation**: The root organization container managing global token budgets and enterprise keystores.
-* **Workstream**: A goal-oriented initiative bound to a specific blueprint (e.g. `1hour-sprint`) and SLA timeline.
-* **Team**: A cross-functional group led by a **Reasoning Lead** agent (10% Tier) responsible for synthesis and evaluation.
-* **SME (Subject Matter Expert)**: Focused, stateless execution agents (90% Tier) specialized in discovery, drafting, linting, or code transformations.
+* **Federation**: The root organization container managing global token budgets, hardware keystores, and system-wide security constraints.
+* **Workstream**: A goal-oriented initiative bound to a specific execution blueprint and SLA timeline.
+* **Team**: A cross-functional unit directed by a **Reasoning Lead** agent (10% tier) responsible for validation, critique, and synthesis.
+* **SME (Subject Matter Expert)**: Specialized, stateless execution agents (90% tier) focused on narrow analytical, architectural, or code transformation tasks.
 
 ---
 
-## 2. The Decoupled Blackboard Store
+## 2. The Decoupled Blackboard Store Inner Workings
 
-Traditional agent swarms pass cumulative chat history between agents. In SyntropyOS, **agents never see raw peer chat history**. Instead, all collaboration is mediated via the **Blackboard Store**.
+Traditional agent swarms pass cumulative chat history between agents, causing catastrophic context window expansion, hallucinations, and prompt pollution. In SyntropyOS, **agents never inspect peer conversation transcripts**. All collaboration is mediated exclusively via the **Blackboard Store**.
 
 ### Deterministic URI Scheme
-Every artifact created by an agent is addressed by a globally unique, immutable URI:
+Every artifact emitted by an agent is addressed by an immutable, deterministic URI:
 
 ```text
 blackboard://{workstream_id}/{team_id}/{agent_id}/{artifact_name}@v{version}
@@ -51,7 +53,7 @@ blackboard://{workstream_id}/{team_id}/{agent_id}/{artifact_name}@v{version}
 * **Example**: `blackboard://ws-sprint-104/team-research/sme_research/user_journey@v1`
 
 ### Zero-Trust Author Write ACLs (`WriteAclGuard`)
-To prevent rogue mutations or race conditions:
+To prevent unauthorized data mutation, race conditions, or cross-agent prompt injection:
 1. An agent may only write to URIs where `uri.agent_id == caller_agent_id`.
 2. The payload's `artifact.author_id` must match `caller_agent_id`.
 3. Any unauthorized write attempt immediately halts with:
@@ -63,20 +65,26 @@ To prevent rogue mutations or race conditions:
 When an agent publishes an artifact, the Blackboard does **not** broadcast the content payload. Instead, it emits a lightweight `BlackboardSignal` containing only metadata:
 * `uri`, `author_id`, `title`, `version`, `content_hash` (SHA-256), `size_bytes`.
 
-Peer agents listen to the signal bus over `tokio::sync::broadcast` and retrieve the artifact body on-demand, maintaining **O(1) token overhead**.
+Peer agents subscribe to the signal bus over `tokio::sync::broadcast` and pull artifact content on-demand, preserving strict **O(1) token overhead**.
 
 ---
 
-## 3. The Flagship 1-Hour Agentic Sprint Blueprint
+## 3. Agent-to-Agent & Team-of-Teams Inner Workings
 
-The flagship blueprint is a rigid 60-minute SLA divided into 4 sequential 15-minute phases:
+The orchestration layer coordinates work across two critical communication boundaries:
 
-| Phase | Time Window | Focus | Agents Active | Primary Output |
-|---|---|---|---|---|
-| **Phase 1: Understand & Map** | 00–15m | Ingest directives, map user journeys, extract entities. | `sme_research` | `user_journey@v1` |
-| **Phase 2: Sketch & Ideate** | 15–30m | Parallel architectural sketches & schema drafts. | `sme_architect`, `sme_designer` | `arch_sketch@v1` |
-| **Phase 3: Decide & Storyboard** | 30–45m | Critical trade-off analysis and decision matrix. | `team_lead`, `sme_evaluator` | `decision_matrix@v1` |
-| **Phase 4: Prototype & Synthesize** | 45–60m | Working code implementation, tests, and synthesis. | `sme_builder`, `sme_qa` | `TeamPlan@v1` |
+### Agent-to-Agent (Intra-Team)
+Within a single team, Subject Matter Experts operate in parallel isolation:
+* **Blind Discovery**: Multiple SMEs analyze the same problem without seeing peer intermediate prompts. This eliminates confirmation bias and premature consensus.
+* **Pull-Based Context**: An SME requiring prior context requests specific artifact URIs from the Blackboard instead of loading conversational history.
+* **Lead Mediation**: The Team Lead monitors published signals, verifies that required artifacts conform to schemas, and triggers downstream task readiness.
+
+### Team-of-Teams (Inter-Team & Workstream Federation)
+When scaling across complex enterprise projects, multiple teams run concurrently within a Workstream:
+* **Federated Namespaces**: Teams communicate through published interfaces in the Blackboard hierarchy:
+  `blackboard://{workstream_id}/{team_a}/...` $\leftrightarrow$ `blackboard://{workstream_id}/{team_b}/...`
+* **Lead-to-Lead Crosswalks**: Team Leads exchange synthesized `TeamPlan` and architecture contracts rather than raw SME outputs, keeping cross-team context tight and focused.
+* **Global Workstream Alignment**: The Workstream coordinator tracks overall milestone velocity and dependency fulfillment across all sub-teams using the DAG engine.
 
 ---
 
@@ -84,8 +92,8 @@ The flagship blueprint is a rigid 60-minute SLA divided into 4 sequential 15-min
 
 Workstream task dependencies are represented as a Directed Acyclic Graph (DAG):
 
-1. **Cycle Detection**: Validated on task insertion using Depth-First Search (`detect_cycle()`). Circular dependencies are rejected immediately.
-2. **Kahn's Topological Sort**: Resolves task readiness in $O(V + E)$ time. Tasks with in-degree 0 are scheduled for parallel execution across the threadpool.
+1. **Cycle Detection**: Validated on task insertion using Depth-First Search (`detect_cycle()`). Circular dependencies are rejected immediately with descriptive path errors.
+2. **Kahn's Topological Sort**: Resolves task readiness in O(V + E) time. Tasks with in-degree 0 are scheduled for parallel execution across the Tokio threadpool.
 
 ```rust
 // syntropy-core/src/dag.rs
@@ -116,7 +124,7 @@ SyntropyOS routes model prompts asymmetrically to optimize throughput, speed, an
 
 ## 6. Plan Synthesis (`AgentResult` → `TeamPlan`)
 
-At the conclusion of a workstream phase, the Team Lead aggregates the discrete `BlackboardArtifact` pointers and compiles them into a structured `TeamPlan`:
+At the conclusion of a workstream milestone, the Team Lead aggregates the discrete `BlackboardArtifact` pointers and compiles them into a structured `TeamPlan`:
 
 ```text
 ┌─────────────────────────┐    ┌─────────────────────────┐
