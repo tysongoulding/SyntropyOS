@@ -1,0 +1,165 @@
+@import "katex/dist/katex.min.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #0d1117;
+  --bg-card: #161b22;
+  --text-main: #c9d1d9;
+  --border-main: #30363d;
+  --color-accent: #1f6feb;
+  --color-highlight: #264f78;
+}
+
+::selection {
+  background-color: var(--color-highlight) !important;
+  color: #ffffff !important;
+}
+
+html,
+body,
+#root,
+input,
+textarea,
+select,
+button {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ==========================================================================
+   Universal Dynamic Theme Surface Binding (Light, Dark, Presets & Custom)
+   ========================================================================== */
+
+aside,
+header,
+footer,
+.bg-\[\#0d1117\],
+.bg-\[\#101010\] {
+  background-color: var(--bg-main) !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.bg-\[\#161b22\],
+.bg-\[\#181818\] {
+  background-color: var(--bg-card) !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.border-\[\#30363d\],
+.border-\[\#282828\] {
+  border-color: var(--border-main) !important;
+  transition: border-color 0.15s ease;
+}
+
+.text-\[\#c9d1d9\],
+.text-\[\#cccccc\] {
+  color: var(--text-main) !important;
+  transition: color 0.15s ease;
+}
+
+/* Dark Mode Scheme */
+html.dark {
+  color-scheme: dark;
+}
+
+/* Light Mode Overrides */
+html.light {
+  color-scheme: light;
+}
+
+html.light .bg-\[\#21262d\],
+html.light .bg-\[\#282828\] {
+  background-color: #f3f4f6 !important;
+}
+
+html.light .text-\[\#8b949e\] {
+  color: #4b5563 !important;
+}
+
+html.light .text-white {
+  color: #111827 !important;
+}
+
+/* Light Mode Hover & Interactive Surface Overrides */
+html.light .hover\:bg-\[\#161b22\]:hover,
+html.light .hover\:bg-\[\#21262d\]:hover,
+html.light .hover\:bg-\[\#30363d\]:hover,
+html.light .hover\:bg-\[\#0d1117\]:hover {
+  background-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+html.light .hover\:text-white:hover,
+html.light .group:hover .group-hover\:text-white,
+html.light .hover\:text-\[\#c9d1d9\]:hover {
+  color: #111827 !important;
+}
+
+html.light .hover\:border-\[\#8b949e\]:hover,
+html.light .hover\:border-\[\#30363d\]:hover {
+  border-color: #d1d5db !important;
+}
+
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-main) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Vertical scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 0px;
+}
+
+/* Hide horizontal scrollbar everywhere */
+::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+/* No-scrollbar utilities */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
