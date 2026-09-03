@@ -89,10 +89,19 @@ npm run build
 
 ---
 
-## 📚 Specialized Guides
+---
 
-For in-depth domain specifics, consult:
-* **[FRONTEND.md](docs/FRONTEND.md)**: React 19 layout, components, Zustand stores, Tailwind tokens, and view routing.
-* **[BACKEND.md](docs/BACKEND.md)**: Tauri 2.0 host, Rig.rs 0.42+ engine integration, Blackboard store specification, and DAG pipeline.
-* **[ORCHESTRATION.md](docs/ORCHESTRATION.md)**: 4-tier federation hierarchy, Blackboard store zero-trust ACLs, O(1) signal bus, and 1-Hour Sprint blueprint.
-* **[SPEC.md](SPEC.md)**: Living backlog, deliverable checklist, and user change tracking.
+## 🤖 Autonomous Context Loading Directives (Mandatory for AI Agents)
+
+All AI agents operating in this repository MUST autonomously read the relevant domain specification before analyzing, planning, or writing code:
+
+| Task Domain / Scope | Mandatory Document to Read First | Contents & Enforced Invariants |
+|---|---|---|
+| **Frontend & UI**: Views, Components, Layout, Styling, Themes, Zustand Stores, Tauri IPC client | [`docs/FRONTEND.md`](docs/FRONTEND.md) | Enforces React 19 patterns, electric tri-color tokens (`#58a6ff`, `#c084fc`, `#f472b6`), and Zustand store registry. |
+| **Backend & Engine**: Tauri 2.0 host, Rust crates, Keystore, Paths, OAuth, Rig.rs providers, Resilience | [`docs/BACKEND.md`](docs/BACKEND.md) | Enforces 100% safe Rust, hardware keystore (`keyring` + `Zeroizing<String>`), `tauri-plugin-opener`, and zero shell injection. |
+| **Orchestration & Federation**: Swarms, Blackboard Store, Write ACLs, Task DAG, Sprints, 90/10 Router | [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) | Enforces 4-tier hierarchy, author write isolation, $O(1)$ signal bus, and 1-Hour Sprint blueprint invariants. |
+| **Deliverables & Tasks**: Backlog items, user requirements, status checks, progress tracking | [`SPEC.md`](SPEC.md) | Enforces living checklist rules (`[ ]` user adds, `[x]` AI marks only after 3-gate verification passes). |
+
+> [!IMPORTANT]
+> **No Blind Edits**: AI agents must never modify files in `src/`, `src-tauri/`, or `crates/` without first loading the corresponding domain guide via `view_file`.
+
