@@ -145,7 +145,7 @@ export function Sidebar() {
           className="w-full flex items-center justify-center space-x-2 py-1.5 px-3 bg-[#161b22] hover:bg-[#21262d] text-white rounded-lg border border-[#30363d] font-medium transition"
           title="Create a new standalone Agent"
         >
-          <User className="w-4 h-4 text-purple-400" />
+          <User className="w-4 h-4 text-[#f472b6]" />
           <span>New Agent</span>
         </button>
 
@@ -169,7 +169,7 @@ export function Sidebar() {
           onClick={() => setActiveView("workstreams")}
           className={`w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg transition text-left ${
             activeView === "workstreams"
-              ? "bg-gradient-to-r from-[#58a6ff]/20 via-purple-500/20 to-pink-500/20 text-white font-medium border border-purple-500/40"
+              ? "bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 text-white font-medium border border-[#f472b6]/40"
               : "text-[#c9d1d9] hover:bg-[#161b22] border border-transparent"
           }`}
           title="Workstream Federations & 1-Hour Sprints"
@@ -181,12 +181,12 @@ export function Sidebar() {
           onClick={() => setActiveView("customise")}
           className={`w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg transition text-left ${
             activeView === "customise"
-              ? "bg-[#1f6feb]/20 text-[#58a6ff] font-medium border border-blue-500/40"
+              ? "bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 text-white font-medium border border-[#f472b6]/40"
               : "text-[#c9d1d9] hover:bg-[#161b22] border border-transparent"
           }`}
           title="Appearance, Chat Personas & Customisation"
         >
-          <WandSparkles className="w-4 h-4 text-pink-400" />
+          <WandSparkles className="w-4 h-4 text-[#58a6ff]" />
           <span>Customise</span>
         </button>
 
@@ -194,12 +194,12 @@ export function Sidebar() {
           onClick={() => setActiveView("artifacts")}
           className={`w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg transition text-left ${
             activeView === "artifacts"
-              ? "bg-[#1f6feb]/20 text-[#58a6ff] font-medium border border-blue-500/40"
+              ? "bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 text-white font-medium border border-[#f472b6]/40"
               : "text-[#c9d1d9] hover:bg-[#161b22] border border-transparent"
           }`}
           title="Artifacts, Diagrams & Presentation Decks"
         >
-          <Layers className="w-4 h-4 text-cyan-400" />
+          <Layers className="w-4 h-4 text-[#58a6ff]" />
           <span>Artifacts</span>
         </button>
 
@@ -207,12 +207,12 @@ export function Sidebar() {
           onClick={() => setActiveView("automation")}
           className={`w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg transition text-left ${
             activeView === "automation"
-              ? "bg-[#1f6feb]/20 text-[#58a6ff] font-medium border border-blue-500/40"
+              ? "bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 text-white font-medium border border-[#f472b6]/40"
               : "text-[#c9d1d9] hover:bg-[#161b22] border border-transparent"
           }`}
           title="Dynamic Tools, Cron & Automation Jobs"
         >
-          <Route className="w-4 h-4 text-emerald-400" />
+          <Route className="w-4 h-4 text-[#58a6ff]" />
           <span>Automation</span>
         </button>
       </div>
@@ -287,7 +287,7 @@ export function Sidebar() {
                       key={agent.id}
                       className={`relative w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition group cursor-pointer ${
                         isChattingWithThisAgent
-                          ? "bg-purple-950/40 text-purple-200 border border-purple-800/60"
+                          ? "bg-[#f472b6]/10 text-[#f472b6] border border-[#f472b6]/30"
                           : "text-[#c9d1d9] hover:bg-[#161b22] border border-transparent hover:border-[#30363d]"
                       }`}
                       onClick={() => handleChatWithAgent(agent)}
@@ -298,14 +298,14 @@ export function Sidebar() {
                         <div className="relative flex-shrink-0">
                           <Bot
                             className={`w-3.5 h-3.5 ${
-                              isChattingWithThisAgent ? "text-purple-400" : "text-purple-300"
+                              isChattingWithThisAgent ? "text-[#f472b6]" : "text-[#58a6ff]"
                             }`}
                           />
                           <span
                             className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${
                               agent.state === "running"
-                                ? "bg-yellow-400 animate-pulse"
-                                : "bg-emerald-500"
+                                ? "bg-[#f472b6] animate-pulse"
+                                : "bg-[#58a6ff]"
                             }`}
                           />
                         </div>
@@ -313,7 +313,7 @@ export function Sidebar() {
                           <div className="truncate text-xs font-medium text-white">{agent.name}</div>
                           <div className="text-[10px] text-[#8b949e] truncate leading-tight flex items-center space-x-1">
                             {agent.workspaceMode === "branch" && (
-                              <GitBranch className="w-2.5 h-2.5 text-cyan-400" />
+                              <GitBranch className="w-2.5 h-2.5 text-[#58a6ff]" />
                             )}
                             <span className="truncate">{agent.role}</span>
                           </div>

@@ -71,35 +71,35 @@ export function Titlebar() {
     switch (phase) {
       case "thinking":
         return (
-          <div className="flex items-center space-x-1.5 text-purple-400 bg-purple-950/30 px-2 py-0.5 rounded-full border border-purple-800/40 animate-pulse">
+          <div className="flex items-center space-x-1.5 text-[#f472b6] bg-[#f472b6]/10 px-2 py-0.5 rounded-full border border-[#f472b6]/30 animate-pulse">
             <Brain className="w-3.5 h-3.5" />
             <span>Thinking...</span>
           </div>
         );
       case "streaming_text":
         return (
-          <div className="flex items-center space-x-1.5 text-blue-400 bg-blue-950/30 px-2 py-0.5 rounded-full border border-blue-800/40 animate-pulse">
+          <div className="flex items-center space-x-1.5 text-[#58a6ff] bg-[#58a6ff]/10 px-2 py-0.5 rounded-full border border-[#58a6ff]/30 animate-pulse">
             <Activity className="w-3.5 h-3.5" />
             <span>Streaming...</span>
           </div>
         );
       case "awaiting_approval":
         return (
-          <div className="flex items-center space-x-1.5 text-amber-400 bg-amber-950/30 px-2 py-0.5 rounded-full border border-amber-800/40 animate-bounce">
+          <div className="flex items-center space-x-1.5 text-[#f472b6] bg-[#f472b6]/10 px-2 py-0.5 rounded-full border border-[#f472b6]/30 animate-bounce">
             <ShieldAlert className="w-3.5 h-3.5" />
             <span>Waiting Approval</span>
           </div>
         );
       case "executing_tool":
         return (
-          <div className="flex items-center space-x-1.5 text-yellow-400 bg-yellow-950/30 px-2 py-0.5 rounded-full border border-yellow-800/40 animate-pulse">
+          <div className="flex items-center space-x-1.5 text-[#58a6ff] bg-[#58a6ff]/10 px-2 py-0.5 rounded-full border border-[#58a6ff]/30 animate-pulse">
             <Wrench className="w-3.5 h-3.5 animate-spin" />
             <span>Running Tool...</span>
           </div>
         );
       case "error":
         return (
-          <div className="flex items-center space-x-1.5 text-red-400 bg-red-950/30 px-2 py-0.5 rounded-full border border-red-800/40">
+          <div className="flex items-center space-x-1.5 text-[#f472b6] bg-[#f472b6]/10 px-2 py-0.5 rounded-full border border-[#f472b6]/30">
             <AlertCircle className="w-3.5 h-3.5" />
             <span>Error</span>
           </div>
@@ -124,10 +124,10 @@ export function Titlebar() {
           className="flex items-center space-x-2 mr-1 hover:opacity-85 transition cursor-pointer group p-0.5 rounded"
           title="Go to Home & Start New Chat"
         >
-          <div className="flex items-center justify-center w-5 h-5 rounded bg-gradient-to-br from-[#58a6ff] via-purple-400 to-pink-400 group-hover:scale-105 transition shadow-sm">
+          <div className="flex items-center justify-center w-5 h-5 rounded bg-gradient-to-br from-[#58a6ff] to-[#f472b6] group-hover:scale-105 transition shadow-sm">
             <Zap className="w-3 h-3 text-white fill-white" />
           </div>
-          <span className="font-semibold tracking-wide transition text-transparent bg-clip-text bg-gradient-to-r from-[#58a6ff] via-purple-400 to-pink-400">
+          <span className="font-semibold tracking-wide transition text-transparent bg-clip-text bg-gradient-to-r from-[#58a6ff] to-[#f472b6]">
             SyntropyOS
           </span>
           <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#21262d] text-[#8b949e] font-mono border border-[#30363d]">

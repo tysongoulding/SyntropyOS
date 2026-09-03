@@ -84,7 +84,7 @@ export const WorkstreamsView: React.FC = () => {
       <div className="flex items-center justify-between pb-4 border-b border-[#30363d]">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="p-1.5 rounded-lg bg-gradient-to-br from-[#58a6ff] via-purple-400 to-pink-400 flex items-center justify-center shadow-sm">
+            <span className="p-1.5 rounded-lg bg-gradient-to-br from-[#58a6ff] to-[#f472b6] flex items-center justify-center shadow-sm">
               <Zap className="w-3.5 h-3.5 text-white fill-white" />
             </span>
             <h1 className="text-xl font-bold text-white tracking-tight">
@@ -101,7 +101,7 @@ export const WorkstreamsView: React.FC = () => {
             onClick={() => setActiveTab("hub")}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition ${
               activeTab === "hub"
-                ? "bg-gradient-to-r from-[#58a6ff] via-purple-500 to-pink-500 text-white shadow-sm"
+                ? "bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white shadow-sm"
                 : "text-[#8b949e] hover:text-white"
             }`}
           >
@@ -111,7 +111,7 @@ export const WorkstreamsView: React.FC = () => {
             onClick={() => setActiveTab("board")}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition ${
               activeTab === "board"
-                ? "bg-gradient-to-r from-[#58a6ff] via-purple-500 to-pink-500 text-white shadow-sm"
+                ? "bg-gradient-to-r from-[#58a6ff] to-[#f472b6] text-white shadow-sm"
                 : "text-[#8b949e] hover:text-white"
             }`}
           >
@@ -124,13 +124,13 @@ export const WorkstreamsView: React.FC = () => {
         <div className="space-y-6">
           {/* Featured 1-Hour Sprint Card with Gradient Glow */}
           <div className="relative rounded-2xl p-6 bg-[#161b22] border border-[#30363d] overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-[#58a6ff]/10 via-purple-500/10 to-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-[#58a6ff]/10 to-[#f472b6]/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="flex items-start justify-between relative z-10">
               <div className="space-y-3 max-w-2xl">
                 <div className="flex items-center space-x-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-[#58a6ff]/20 via-purple-400/20 to-pink-400/20 text-transparent bg-clip-text bg-gradient-to-r from-[#58a6ff] via-purple-400 to-pink-400 border border-purple-500/30 flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-purple-400 fill-purple-400" />
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-[#58a6ff]/20 to-[#f472b6]/20 text-transparent bg-clip-text bg-gradient-to-r from-[#58a6ff] to-[#f472b6] border border-[#f472b6]/30 flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-[#f472b6] fill-[#f472b6]" />
                     Flagship 60-Minute SLA Blueprint
                   </span>
                   <span className="text-xs text-[#8b949e]">Zero Groupthink • O(1) Signal Bus</span>
@@ -141,7 +141,7 @@ export const WorkstreamsView: React.FC = () => {
                 </h2>
 
                 <p className="text-xs text-[#c9d1d9] leading-relaxed">
-                  Deploys a decoupled 4-tier federation (<span className="text-[#58a6ff] font-medium">Federation</span> &gt; <span className="text-purple-400 font-medium">Workstream</span> &gt; <span className="text-pink-400 font-medium">Team</span> &gt; <span className="text-white font-medium">SME</span>). SMEs execute blind parallel discovery across 4 rigid phases to deliver an actionable TeamPlan without conversation transcript cascading.
+                  Deploys a decoupled 4-tier federation (<span className="text-[#58a6ff] font-medium">Federation</span> &gt; <span className="text-[#f472b6] font-medium">Workstream</span> &gt; <span className="text-[#58a6ff] font-medium">Team</span> &gt; <span className="text-[#f472b6] font-medium">SME</span>). SMEs execute blind parallel discovery across 4 rigid phases to deliver an actionable TeamPlan without conversation transcript cascading.
                 </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 text-[11px]">
@@ -151,17 +151,17 @@ export const WorkstreamsView: React.FC = () => {
                     <p className="text-[10px] text-[#8b949e] mt-0.5">Research SMEs</p>
                   </div>
                   <div className="p-3 rounded-xl bg-[#0d1117] border border-[#30363d]">
-                    <span className="text-purple-400 font-semibold block text-[10px] uppercase">Phase 2 (15-30m)</span>
+                    <span className="text-[#f472b6] font-semibold block text-[10px] uppercase">Phase 2 (15-30m)</span>
                     <span className="text-white font-medium">Sketch & Ideate</span>
                     <p className="text-[10px] text-[#8b949e] mt-0.5">Architect SMEs</p>
                   </div>
                   <div className="p-3 rounded-xl bg-[#0d1117] border border-[#30363d]">
-                    <span className="text-pink-400 font-semibold block text-[10px] uppercase">Phase 3 (30-45m)</span>
+                    <span className="text-[#58a6ff] font-semibold block text-[10px] uppercase">Phase 3 (30-45m)</span>
                     <span className="text-white font-medium">Decide & Storyboard</span>
                     <p className="text-[10px] text-[#8b949e] mt-0.5">Team PM & Evaluators</p>
                   </div>
                   <div className="p-3 rounded-xl bg-[#0d1117] border border-[#30363d]">
-                    <span className="text-emerald-400 font-semibold block text-[10px] uppercase">Phase 4 (45-60m)</span>
+                    <span className="text-[#f472b6] font-semibold block text-[10px] uppercase">Phase 4 (45-60m)</span>
                     <span className="text-white font-medium">Prototype & Synthesize</span>
                     <p className="text-[10px] text-[#8b949e] mt-0.5">Builders & QA</p>
                   </div>
@@ -171,7 +171,7 @@ export const WorkstreamsView: React.FC = () => {
               <button
                 onClick={handleLaunchSprint}
                 disabled={launching}
-                className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#58a6ff] via-purple-500 to-pink-500 hover:opacity-95 active:scale-95 text-white font-semibold text-xs flex items-center space-x-2 transition shadow-lg shadow-purple-950/50 disabled:opacity-50 shrink-0"
+                className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#58a6ff] to-[#f472b6] hover:opacity-95 active:scale-95 text-white font-semibold text-xs flex items-center space-x-2 transition shadow-lg shadow-pink-950/50 disabled:opacity-50 shrink-0"
               >
                 <Play className="w-4 h-4 fill-white" />
                 <span>{launching ? "Dispatching..." : "Launch 1-Hour Sprint"}</span>
@@ -194,13 +194,13 @@ export const WorkstreamsView: React.FC = () => {
                     setActiveWorkstream(ws.id);
                     setActiveTab("board");
                   }}
-                  className="p-4 rounded-xl bg-[#161b22] border border-[#30363d] hover:border-purple-500/60 cursor-pointer transition group"
+                  className="p-4 rounded-xl bg-[#161b22] border border-[#30363d] hover:border-[#f472b6]/60 cursor-pointer transition group"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-xs text-white group-hover:text-[#58a6ff] transition">
                       {ws.name}
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-950/30 text-purple-400 border border-purple-800/40 uppercase">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#f472b6]/10 text-[#f472b6] border border-[#f472b6]/30 uppercase">
                       {ws.status}
                     </span>
                   </div>
@@ -226,11 +226,11 @@ export const WorkstreamsView: React.FC = () => {
               <span className="text-white font-semibold">Hierarchy:</span>
               <span className="px-2 py-0.5 rounded bg-[#0d1117] text-[#c9d1d9]">Global Federation</span>
               <span>&gt;</span>
-              <span className="px-2 py-0.5 rounded bg-[#0d1117] text-purple-400 border border-purple-800/40 font-medium">
+              <span className="px-2 py-0.5 rounded bg-[#0d1117] text-[#58a6ff] border border-[#58a6ff]/40 font-medium">
                 {activeWs?.name}
               </span>
               <span>&gt;</span>
-              <span className="px-2 py-0.5 rounded bg-[#0d1117] text-pink-400 font-medium">Core Team</span>
+              <span className="px-2 py-0.5 rounded bg-[#0d1117] text-[#f472b6] font-medium">Core Team</span>
             </div>
 
             <div className="flex items-center space-x-2 text-[11px]">
@@ -238,7 +238,7 @@ export const WorkstreamsView: React.FC = () => {
               <span className="px-2 py-0.5 rounded bg-blue-950/40 text-[#58a6ff] border border-blue-800/40 font-mono">
                 90% SME Fast
               </span>
-              <span className="px-2 py-0.5 rounded bg-purple-950/40 text-purple-400 border border-purple-800/40 font-mono">
+              <span className="px-2 py-0.5 rounded bg-pink-950/40 text-[#f472b6] border border-pink-800/40 font-mono">
                 10% Reasoning Lead
               </span>
             </div>
@@ -269,11 +269,11 @@ export const WorkstreamsView: React.FC = () => {
                       tasksInPhase.map((task) => (
                         <div
                           key={task.id}
-                          className="bg-[#0d1117] border border-[#30363d] hover:border-purple-500/50 rounded-xl p-3 space-y-2 shadow-sm"
+                          className="bg-[#0d1117] border border-[#30363d] hover:border-[#f472b6]/50 rounded-xl p-3 space-y-2 shadow-sm"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-1.5">
-                              <Bot className="w-3.5 h-3.5 text-purple-400" />
+                              <Bot className="w-3.5 h-3.5 text-[#f472b6]" />
                               <span className="font-semibold text-xs text-white">{task.role}</span>
                             </div>
                             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded uppercase bg-blue-950/40 text-[#58a6ff] border border-blue-800/40">
@@ -285,7 +285,7 @@ export const WorkstreamsView: React.FC = () => {
                             <Users className="w-3 h-3 text-[#58a6ff]" />
                             <span className="text-white">{task.agentId}</span>
                             <span>•</span>
-                            <span className="text-purple-400">
+                            <span className="text-[#f472b6]">
                               {task.agentId.includes("lead") || task.agentId.includes("pm")
                                 ? "Frontier Reasoning"
                                 : "90% Fast Tier"}
@@ -299,7 +299,7 @@ export const WorkstreamsView: React.FC = () => {
                           )}
 
                           {task.status === "completed" && (
-                            <div className="text-[10px] text-emerald-400 flex items-center space-x-1 pt-1 font-medium">
+                            <div className="text-[10px] text-[#58a6ff] flex items-center space-x-1 pt-1 font-medium">
                               <CheckCircle2 className="w-3 h-3" />
                               <span>Blackboard artifact published</span>
                             </div>

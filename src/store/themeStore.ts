@@ -28,7 +28,7 @@ export const THEME_PRESETS: PresetTheme[] = [
       card: "#161b22",
       border: "#30363d",
       accent: "#58a6ff",
-      highlight: "#c084fc",
+      highlight: "#f472b6",
     },
     light: {
       background: "#ffffff",
@@ -36,7 +36,7 @@ export const THEME_PRESETS: PresetTheme[] = [
       card: "#f6f8fa",
       border: "#d0d7de",
       accent: "#58a6ff",
-      highlight: "#c084fc",
+      highlight: "#f472b6",
     },
   },
   {

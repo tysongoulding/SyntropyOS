@@ -92,13 +92,13 @@ export function Statusbar() {
   const renderProviderIcon = (provider: GitProvider) => {
     switch (provider) {
       case "github":
-        return <GitBranch className="w-3 h-3 text-purple-400" />;
+        return <GitBranch className="w-3 h-3 text-[#58a6ff]" />;
       case "gitlab":
-        return <Globe className="w-3 h-3 text-orange-400" />;
+        return <Globe className="w-3 h-3 text-[#f472b6]" />;
       case "bitbucket":
-        return <Globe className="w-3 h-3 text-blue-400" />;
+        return <Globe className="w-3 h-3 text-[#58a6ff]" />;
       default:
-        return <GitBranch className="w-3 h-3 text-purple-400" />;
+        return <GitBranch className="w-3 h-3 text-[#58a6ff]" />;
     }
   };
 

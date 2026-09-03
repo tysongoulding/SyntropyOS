@@ -91,27 +91,27 @@ export function HomeHeroView({ fullname, onSelectPrompt }: HomeHeroViewProps) {
   const renderWeatherIcon = (condition: string) => {
     const cond = condition.toLowerCase();
     if (cond.includes("sun") || cond.includes("clear")) {
-      return <Sun className="w-5 h-5 text-amber-400 animate-[spin_12s_linear_infinite]" />;
+      return <Sun className="w-5 h-5 text-[#58a6ff] animate-[spin_12s_linear_infinite]" />;
     }
     if (cond.includes("partly")) {
-      return <CloudSun className="w-5 h-5 text-yellow-300" />;
+      return <CloudSun className="w-5 h-5 text-[#f472b6]" />;
     }
     if (cond.includes("rain") || cond.includes("shower") || cond.includes("drizzle")) {
-      return <CloudRain className="w-5 h-5 text-blue-400" />;
+      return <CloudRain className="w-5 h-5 text-[#58a6ff]" />;
     }
     if (cond.includes("snow") || cond.includes("ice")) {
-      return <CloudSnow className="w-5 h-5 text-cyan-300" />;
+      return <CloudSnow className="w-5 h-5 text-[#f472b6]" />;
     }
     if (cond.includes("thunder") || cond.includes("storm")) {
-      return <CloudLightning className="w-5 h-5 text-purple-400" />;
+      return <CloudLightning className="w-5 h-5 text-[#58a6ff]" />;
     }
     if (cond.includes("fog") || cond.includes("mist")) {
-      return <CloudFog className="w-5 h-5 text-slate-400" />;
+      return <CloudFog className="w-5 h-5 text-[#58a6ff]" />;
     }
     if (cond.includes("wind")) {
-      return <Wind className="w-5 h-5 text-teal-400" />;
+      return <Wind className="w-5 h-5 text-[#f472b6]" />;
     }
-    return <Cloud className="w-5 h-5 text-gray-400" />;
+    return <Cloud className="w-5 h-5 text-[#58a6ff]" />;
   };
 
   const starterSuggestions = [
@@ -119,28 +119,28 @@ export function HomeHeroView({ fullname, onSelectPrompt }: HomeHeroViewProps) {
       title: "Rust Engine Pipeline",
       desc: "Tokio FSM channel event bus & zero-copy SSE streams",
       icon: Sparkles,
-      color: "text-blue-400",
+      color: "text-[#58a6ff]",
       prompt: "Explain the Rust asynchronous Tokio event bus and streaming FSM state transitions.",
     },
     {
       title: "Red-Green TDD Audit",
       desc: "Verify strict red-to-green test cycles and Clippy lints",
       icon: Shield,
-      color: "text-purple-400",
+      color: "text-[#f472b6]",
       prompt: "Audit recent codebase diffs against strict red-first TDD invariants and zero-tolerance Clippy lint rules.",
     },
     {
       title: "Mermaid & Vector Diagrams",
       desc: "Generate interactive architecture topologies",
       icon: Layers,
-      color: "text-cyan-400",
+      color: "text-[#58a6ff]",
       prompt: "Create an interactive Mermaid state diagram visualizing autonomous subagent delegation and MCP tool dispatch.",
     },
     {
       title: "Slide Deck Presentation",
       desc: "Scaffold a 5-slide product & technical roadmap deck",
       icon: Presentation,
-      color: "text-pink-400",
+      color: "text-[#f472b6]",
       prompt: "Generate a 5-slide presentation deck covering Rho Lota Studio 2.0 architecture, benchmarks, and roadmap.",
     },
   ];
@@ -162,14 +162,14 @@ export function HomeHeroView({ fullname, onSelectPrompt }: HomeHeroViewProps) {
           <span className="text-gray-600">|</span>
 
           <div className="flex items-center space-x-1 text-[#8b949e]">
-            <MapPin className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+            <MapPin className="w-3.5 h-3.5 text-[#f472b6] flex-shrink-0" />
             <span className="truncate max-w-[140px] sm:max-w-none">{weather.city}, {weather.region}</span>
           </div>
 
           <span className="text-gray-600 hidden sm:inline">|</span>
 
           <div className="hidden sm:flex items-center space-x-1 text-[#8b949e]">
-            <Droplets className="w-3.5 h-3.5 text-blue-400" />
+            <Droplets className="w-3.5 h-3.5 text-[#58a6ff]" />
             <span>{weather.humidity}% Humidity</span>
           </div>
         </div>
@@ -197,7 +197,7 @@ export function HomeHeroView({ fullname, onSelectPrompt }: HomeHeroViewProps) {
         {/* Main Personalized Greeting */}
         <div className="space-y-1 pt-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#58a6ff] via-purple-400 to-pink-400">{displayName}</span>
+            {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#58a6ff] to-[#f472b6]">{displayName}</span>
           </h1>
         </div>
       </div>

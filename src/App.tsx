@@ -101,7 +101,7 @@ export function App() {
                 {activeAgent && (
                   <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d] text-xs select-none flex-shrink-0">
                     <div className="flex items-center space-x-2">
-                      <div className="p-1 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                      <div className="p-1 rounded-md bg-[#f472b6]/10 border border-[#f472b6]/20 text-[#f472b6]">
                         <Bot className="w-3.5 h-3.5" />
                       </div>
                       <div className="flex items-center space-x-1.5">
