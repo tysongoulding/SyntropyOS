@@ -1,0 +1,163 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: "Release Please"
+    runs-on: ubuntu-latest
+    outputs:
+      pr: ${{ steps.release.outputs.pr }}
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-workspace:
+    runs-on: ubuntu-latest
+    name: "Update Locks on Release PR"
+    needs: release-please
+    if: ${{ needs.release-please.outputs.pr }}
+    steps:
+      - name: Checkout release PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Sync Locks
+        run: |
+          cargo check --workspace
+          npm install --package-lock-only
+          if git diff --quiet -- Cargo.lock package-lock.json; then
+            echo "Lockfiles are already up to date"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add Cargo.lock package-lock.json
+            git commit -m "chore: update Cargo.lock and package-lock.json for release"
+            git push
+          fi
+
+  build-release:
+    name: "Build ${{ matrix.platform }}"
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "windows-x86_64"
+            os: windows-latest
+          - platform: "macos-universal"
+            os: macos-latest
+          - platform: "linux-x86_64"
+            os: ubuntu-24.04
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Build Tauri Application & Attach Release Assets
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ needs.release-please.outputs.tag_name }}
+          releaseName: 'SyntropyOS ${{ needs.release-please.outputs.tag_name }}'
+          releaseDraft: false
+          prerelease: false
+
+  checksums:
+    name: "Generate SHA256SUMS"
+    needs: [release-please, build-release]
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Download release assets
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist --clobber
+
+      - name: Generate and upload SHA256SUMS
+        run: |
+          rm -f dist/SHA256SUMS
+          cd dist
+          sha256sum -- * > SHA256SUMS
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" SHA256SUMS --clobber
+
+  sync-lock:
+    name: "Sync Locks on main after release"
+    needs: [release-please, build-release]
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Sync Locks on main
+        run: |
+          cargo check --workspace
+          npm install --package-lock-only
+          if git diff --quiet -- Cargo.lock package-lock.json; then
+            echo "Lockfiles are already up to date"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add Cargo.lock package-lock.json
+            git commit -m "chore: sync lockfiles after ${{ needs.release-please.outputs.tag_name }}"
+            git push
+          fi
