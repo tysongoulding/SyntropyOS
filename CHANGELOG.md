@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.1...v0.1.2) (2026-09-04)
+
+
+### Features
+
+* verify automated CI gates and release workflow ([#2](https://github.com/tysongoulding/SyntropyOS/issues/2)) ([f0265b2](https://github.com/tysongoulding/SyntropyOS/commit/f0265b2c0ce19bb66500dd8ed6f10db4fa8ef7b0))
+
 ## [0.1.1](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.0...v0.1.1) (2026-09-04)
 
 

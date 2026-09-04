@@ -4251,7 +4251,7 @@ dependencies = [
 
 [[package]]
 name = "syntropy-core"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "hex",
@@ -4267,7 +4267,7 @@ dependencies = [
 
 [[package]]
 name = "syntropy-engine"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "rand 0.8.8",
@@ -4285,7 +4285,7 @@ dependencies = [
 
 [[package]]
 name = "syntropyOS-tauri"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
