@@ -1,6 +1,6 @@
 ---
 document_type: specification_and_delivery_checklist
-version: 0.6.0
+version: 0.1.0
 rules:
   1_user_ownership: "The user adds new requirements, tasks, or bugfixes as unchecked items: [ ]"
   2_ai_verification_gate: "The AI agent may only check an item [x] AFTER all workspace tests (`cargo test --workspace`), linters (`cargo clippy --workspace -- -D warnings`), and builds (`npm run build`) pass cleanly with exit code 0."
@@ -16,7 +16,7 @@ This specification serves as the living checklist for features, architectural re
 
 ## 📋 Delivery Status Overview
 
-- **Current Version**: `v0.6.0`
+- **Current Version**: `v0.1.0`
 - **Active Branch**: `main`
 - **Rust Test Suite**: `15/15 passing`
 - **Linter Status**: `cargo clippy --workspace -- -D warnings` (Passing)
@@ -52,7 +52,7 @@ This specification serves as the living checklist for features, architectural re
 
 ---
 
-## ✅ Completed Deliverables (v0.6.0)
+## ✅ Completed Deliverables (v0.1.0)
 
 ### Phase 1: Engine & Multi-Provider Architecture (`crates/syntropy-engine`)
 - [x] **Multi-Provider Registry**: Support for Google Gemini, Anthropic Claude, OpenAI, and Groq via Rig.rs 0.42+.

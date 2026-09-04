@@ -20,7 +20,7 @@ interface SettingsStore {
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   systemStatus: {
-    version: "0.6.0",
+    version: "0.1.0",
     os: "windows",
     app_data_dir: "C:\\Users\\tyson\\AppData\\Roaming\\syntrophyOS",
     extensions_dir: "C:\\Users\\tyson\\.syntrophyOS\\extensions",

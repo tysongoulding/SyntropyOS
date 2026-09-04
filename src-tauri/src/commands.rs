@@ -238,7 +238,7 @@ pub async fn execute_command(
         WorkstreamCommand::GetSystemStatus => {
             let total_hours = *state.total_hours_saved.read().await;
             let status = SystemStatus {
-                version: "0.6.0".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
                 os: std::env::consts::OS.to_string(),
                 app_data_dir: state.paths.app_data_dir.to_string_lossy().to_string(),
                 extensions_dir: state.paths.extensions_dir.to_string_lossy().to_string(),

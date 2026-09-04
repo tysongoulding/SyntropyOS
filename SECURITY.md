@@ -10,8 +10,8 @@ We release patches and security fixes for the latest active minor release:
 
 | Version | Supported |
 |---|---|
-| `0.6.x` | :white_check_mark: Active |
-| `< 0.6.0` | :x: End of Life |
+| `0.1.x` | :white_check_mark: Active |
+| `< 0.1.0` | :x: End of Life |
 
 ---
 

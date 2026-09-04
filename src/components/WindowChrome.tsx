@@ -43,7 +43,7 @@ export const WindowChrome: React.FC = () => {
           Syntropy<span className="text-emerald-400 font-bold">OS</span>
         </span>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
-          v0.6.0
+          v0.1.0
         </span>
       </div>
 

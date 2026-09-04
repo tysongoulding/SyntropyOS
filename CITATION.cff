@@ -5,8 +5,8 @@ abstract: "A desktop agentic operating system enabling non-technical department 
 authors:
   - family-names: "Goulding"
     given-names: "Tyson"
-version: 0.6.0
-date-released: 2026-09-03
+version: 0.1.0
+date-released: 2026-09-04
 url: "https://github.com/tysongoulding/SyntropyOS"
 repository-code: "https://github.com/tysongoulding/SyntropyOS"
 license: MIT

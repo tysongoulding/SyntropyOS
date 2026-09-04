@@ -131,7 +131,7 @@ export function Titlebar() {
             SyntropyOS
           </span>
           <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#21262d] text-[#8b949e] font-mono border border-[#30363d]">
-            v0.6.0
+            v0.1.0
           </span>
         </button>
 
