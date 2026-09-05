@@ -7,6 +7,7 @@ pub enum ProviderType {
     Anthropic,
     OpenAi,
     Groq,
+    Ollama,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

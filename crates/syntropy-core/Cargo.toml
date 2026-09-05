@@ -16,3 +16,4 @@ uuid.workspace = true
 regex = "1.10"
 sha2 = "0.10"
 hex = "0.4"
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
