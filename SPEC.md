@@ -16,9 +16,9 @@ This specification serves as the living checklist for features, architectural re
 
 ## 📋 Delivery Status Overview
 
-- **Current Version**: `v0.1.0`
+- **Current Version**: `v0.1.2`
 - **Active Branch**: `main`
-- **Rust Test Suite**: `15/15 passing`
+- **Rust Test Suite**: `30/30 passing`
 - **Linter Status**: `cargo clippy --workspace -- -D warnings` (Passing)
 - **Frontend Build**: `npm run build` (Passing)
 
@@ -83,6 +83,15 @@ This specification serves as the living checklist for features, architectural re
 - [x] **Real-Time Full-Time Agent (FTA) Valuation**: Dynamic labor hours counter with interactive 1–5 star manager calibration (`FtaCounter.tsx` & Sidebar badge).
 - [x] **Human-in-the-Loop (HITL) Modal**: Tool mutation authorization modal intercepting destructive operations (`ApprovalModal.tsx`).
 - [x] **Personalized Home Hero View**: Live clock, date, weather chip, and greeting header (`HomeHeroView.tsx`).
+
+### Phase 5: Substrate, Native Tooling & Mobile Release Hardening (v0.1.2)
+- [x] **SQLite Blackboard Substrate & Single-Writer Actor**: Transactional embedded SQLite storage in WAL mode with a dedicated Tokio `mpsc` single-writer actor channel eliminating `SQLITE_BUSY` lock contention.
+- [x] **Hybrid Content-Addressed Blob Storage**: Offloads deliverables $> 1\text{MB}$ into `blobs/<sha256>.bin` while storing lean metadata and indexing in SQLite.
+- [x] **Native In-Process Tooling Over MCP**: In-process Rust tool execution eliminating external process boundary token bloat and latency.
+- [x] **Strict Workspace Path Jailing**: Target path validation rejecting directory traversal attempts (`..` and external roots) outside the active workspace.
+- [x] **Role-Scoped JIT Tool Injection**: Dynamically filtered tool manifests by sprint phase keeping schemas strictly under 500 tokens.
+- [x] **Deterministic In-Tier Model Failover**: Fast-tier (`gemini-2.5-flash` $\rightarrow$ `llama-3.3-70b` on Groq $\rightarrow$ `llama-3.2-3b` local) and Lead-tier fallback chains.
+- [x] **Mobile Release Pipeline Hardening**: Switched workspace HTTP client to `rustls-tls` eliminating Android OpenSSL cross-compilation errors and added unsigned iOS CI environment flags.
 
 ---
 

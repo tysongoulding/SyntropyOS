@@ -99,4 +99,50 @@ impl ModelRouter {
             }
         }
     }
+
+    /// Deterministic In-Tier Model Failover Chain (ADR-0014):
+    /// Returns primary route followed by in-tier fallbacks before tripping circuit breaker.
+    pub fn failover_chain(&self, profile: &TaskProfile) -> Vec<ModelRoute> {
+        let primary = self.route(profile);
+        match primary.tier {
+            ModelTier::SmeFast => {
+                vec![
+                    primary,
+                    ModelRoute {
+                        tier: ModelTier::SmeFast,
+                        provider: ProviderType::Groq,
+                        model_name: "llama-3.3-70b-versatile".to_string(),
+                        temperature: 0.7,
+                        max_tokens: 4096,
+                    },
+                    ModelRoute {
+                        tier: ModelTier::SmeFast,
+                        provider: ProviderType::Ollama,
+                        model_name: "llama-3.2-3b".to_string(),
+                        temperature: 0.7,
+                        max_tokens: 2048,
+                    },
+                ]
+            }
+            ModelTier::ReasoningLead => {
+                vec![
+                    primary,
+                    ModelRoute {
+                        tier: ModelTier::ReasoningLead,
+                        provider: ProviderType::Anthropic,
+                        model_name: "claude-3-7-sonnet".to_string(),
+                        temperature: 0.2,
+                        max_tokens: 8192,
+                    },
+                    ModelRoute {
+                        tier: ModelTier::ReasoningLead,
+                        provider: ProviderType::OpenAi,
+                        model_name: "o3-mini".to_string(),
+                        temperature: 0.2,
+                        max_tokens: 8192,
+                    },
+                ]
+            }
+        }
+    }
 }
