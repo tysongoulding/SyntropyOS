@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.4](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.3...v0.1.4) (2026-09-05)
+
+
+### Features
+
+* add xAI SpaceX Grok, OAuth PKCE for Google & OpenAI, strict dynamic model replacement, and chat dropup hot sync ([c8db652](https://github.com/tysongoulding/SyntropyOS/commit/c8db652cca0683b6a92f0ccc23c722f09708aac6))
+* **customise:** revamp Plugins tab with dense OAuth integrations and checkmark pills ([0710a94](https://github.com/tysongoulding/SyntropyOS/commit/0710a945295d5e7ab902d21b9eeb8f536978740e))
+* discover live models from API endpoints and cache across backend disk and client storage ([49990ef](https://github.com/tysongoulding/SyntropyOS/commit/49990ef507b25af109fff40c2fdc25494e66e494))
+* dynamic provider model discovery from API key and expanded model catalog ([910fab4](https://github.com/tysongoulding/SyntropyOS/commit/910fab4776a8c0fdfeee01074864e86672f8634f))
+* **editor:** add Cursor-style agent and categorized model pickers with Gemini 3.x/2.x support ([ba13323](https://github.com/tysongoulding/SyntropyOS/commit/ba13323c600a3cc0030597498c7d2ac167983133))
+* embedded sqlite blackboard, native jit tools, and hardened mobile pipeline ([#6](https://github.com/tysongoulding/SyntropyOS/issues/6)) ([c47ab5a](https://github.com/tysongoulding/SyntropyOS/commit/c47ab5a003a5df3a61fc7ba18b9a7f7b40727695))
+* enforce rich markdown & mermaid responses across all providers with full chat rendering support ([207036a](https://github.com/tysongoulding/SyntropyOS/commit/207036a100bb271735f3b24038821270618f39a4))
+* style chat conversation like antigravity with flat canvas AI responses and single user bubble ([be736be](https://github.com/tysongoulding/SyntropyOS/commit/be736be5b9dda0dde3cc314d3335fadda546abe2))
+
+
+### Bug Fixes
+
+* **gemini:** implement test_provider_key, get_saved_auth_keys, load_lota_settings, and live Gemini streaming ([e298d4b](https://github.com/tysongoulding/SyntropyOS/commit/e298d4bbf44c3f605e5168ee37989d9de95e57d2))
+* **gemini:** purge hallucinated 2.5 and 3.x model identifiers and align with official Gemini 2.0/1.5 API lineup ([32059d1](https://github.com/tysongoulding/SyntropyOS/commit/32059d169bfab08099244d91e601e04391acc76e))
+* prune deprecated gemini-2.5-pro, add live generateContent test probe and automatic in-flight model failover ([533210e](https://github.com/tysongoulding/SyntropyOS/commit/533210e76744a32a88bb596ae8e44f91ff707c96))
+* spawn blackboard writer actor on dedicated OS thread to prevent runtime panic ([#8](https://github.com/tysongoulding/SyntropyOS/issues/8)) ([d50ba21](https://github.com/tysongoulding/SyntropyOS/commit/d50ba21f9a652d4f6dbac6b8625db534c143337e))
+* stabilize mermaid diagram rendering and eliminate virtualizer auto-scroll jitter ([937ee81](https://github.com/tysongoulding/SyntropyOS/commit/937ee81e00e340def6d92dce9dc5b182bf85e42b))
+* **startup:** eliminate 30s WPAD devUrl delay and initial white canvas flash ([e46a401](https://github.com/tysongoulding/SyntropyOS/commit/e46a401f3daddd6c19c21feec65a550cd0b369ff))
+* **ui:** synchronize Titlebar and app views with dynamic release version ([ed89f05](https://github.com/tysongoulding/SyntropyOS/commit/ed89f05146ecd552c0710e9e4b1811f9eed23175))
+* **vite:** ignore target, src-tauri, and crates in file watcher to prevent EBUSY locks ([8b546cc](https://github.com/tysongoulding/SyntropyOS/commit/8b546cc3c43494725804c54ae8882a4691e67e04))
+
 ## [0.1.3](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.2...v0.1.3) (2026-09-05)
 
 
