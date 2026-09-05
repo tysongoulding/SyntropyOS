@@ -10,6 +10,7 @@ import {
   KeyRound,
   ShieldAlert,
   Brain,
+  RefreshCw,
 } from "lucide-react";
 
 export function formatModelDisplayName(
@@ -39,6 +40,11 @@ export function formatModelDisplayName(
   else if (clean.includes("o1-mini")) base = "OpenAI o1 Mini";
   else if (clean.includes("o1")) base = "OpenAI o1";
   else if (clean.includes("o3-mini")) base = "OpenAI o3 Mini";
+  else if (clean.includes("grok-2-vision")) base = "Grok 2 Vision";
+  else if (clean.includes("grok-2")) base = "Grok 2";
+  else if (clean.includes("grok-beta")) base = "Grok Beta";
+  else if (clean.includes("grok-3")) base = "Grok 3";
+  else if (clean.includes("grok")) base = "xAI Grok";
   else if (clean.includes("deepseek-reasoner")) base = "DeepSeek Reasoner (R1)";
   else if (clean.includes("deepseek-chat")) base = "DeepSeek Chat (V3)";
   else if (clean.includes("llama-3.3-70b")) base = "Llama 3.3 70B";
@@ -60,8 +66,11 @@ export function ModelDropupPicker() {
     activeProviderId,
     activeModel,
     thinkingLevel,
+    lastSyncedAt,
+    isSyncing,
     setActiveProviderAndModel,
     setThinkingLevel,
+    fetchProviderModels,
   } = useProviderStore();
   const { setSessionModel } = useSessionStore();
   const { setActiveView, setActiveSettingsTab } = useUiStore();
@@ -76,6 +85,21 @@ export function ModelDropupPicker() {
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
+
+  // Stale auto-probe when opened: refresh if not synced yet or > 30 minutes ago
+  useEffect(() => {
+    if (!isOpen) return;
+    const activeProv = providers[activeProviderId];
+    if (!activeProv) return;
+    const hasAuth = activeProv.isConfigured || (activeProv.apiKey && activeProv.apiKey.trim().length > 0) || activeProv.id === "gemini";
+    if (!hasAuth) return;
+
+    const lastSync = lastSyncedAt[activeProviderId] || 0;
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    if (Date.now() - lastSync > thirtyMinutesMs) {
+      fetchProviderModels(activeProviderId).catch(() => {});
+    }
+  }, [isOpen, activeProviderId, providers, lastSyncedAt, fetchProviderModels]);
 
   const isThinkingSupported = useMemo(
     () => supportsThinking(activeModel, activeProviderId),
@@ -94,6 +118,15 @@ export function ModelDropupPicker() {
     setSessionModel(providerId, model);
     addToast(`Switched active model to ${formatModelDisplayName(model, thinkingLevel, providerId)}`, "info");
     setIsOpen(false);
+  };
+
+  const handleSyncActive = async () => {
+    try {
+      const models = await fetchProviderModels(activeProviderId);
+      addToast(`Hot-synced ${models.length} live models for ${providers[activeProviderId]?.name || activeProviderId}`, "success");
+    } catch {
+      addToast(`Failed to sync models for ${activeProviderId}`, "error");
+    }
   };
 
   const handleOpenProviderSettings = () => {
@@ -155,14 +188,27 @@ export function ModelDropupPicker() {
               <span className="text-[10px] text-[#484f58] font-mono italic">Standard Model</span>
             )}
 
-            <button
-              onClick={handleOpenProviderSettings}
-              className="text-[#58a6ff] hover:underline flex items-center space-x-0.5 text-[10px] pl-1"
-              title="Manage API Keys"
-            >
-              <KeyRound className="w-2.5 h-2.5" />
-              <span>Keys</span>
-            </button>
+            <div className="flex items-center space-x-1.5 pl-1">
+              <button
+                type="button"
+                onClick={handleSyncActive}
+                disabled={isSyncing[activeProviderId]}
+                className="text-[#58a6ff] hover:text-white flex items-center space-x-0.5 text-[10px] transition disabled:opacity-50"
+                title="Hot-sync live models from provider"
+              >
+                <RefreshCw className={`w-2.5 h-2.5 ${isSyncing[activeProviderId] ? "animate-spin text-blue-400" : ""}`} />
+                <span>{isSyncing[activeProviderId] ? "Syncing..." : "Sync"}</span>
+              </button>
+
+              <button
+                onClick={handleOpenProviderSettings}
+                className="text-[#8b949e] hover:text-[#c9d1d9] hover:underline flex items-center space-x-0.5 text-[10px]"
+                title="Manage API Keys"
+              >
+                <KeyRound className="w-2.5 h-2.5" />
+                <span>Keys</span>
+              </button>
+            </div>
           </div>
 
           {/* Scrollable Model Group List */}

@@ -7,6 +7,7 @@ export interface ProviderConfig {
   type: "api_key" | "local" | "oauth";
   apiKey?: string;
   endpoint?: string;
+  oauthClientId?: string;
   defaultModel: string;
   models: string[];
   isConfigured: boolean;
@@ -85,6 +86,18 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
     models: ["gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "o3-mini", "gpt-4-turbo"],
     isConfigured: false,
   },
+  xai: {
+    id: "xai",
+    name: "xAI (SpaceX / Grok)",
+    type: "api_key",
+    defaultModel: "grok-2-1212",
+    models: [
+      "grok-2-1212",
+      "grok-2-vision-1212",
+      "grok-beta",
+    ],
+    isConfigured: false,
+  },
   deepseek: {
     id: "deepseek",
     name: "DeepSeek",
@@ -147,13 +160,13 @@ const loadInitialProviders = (): Record<string, ProviderConfig> => {
       const result: Record<string, ProviderConfig> = { ...DEFAULT_PROVIDERS };
       for (const [key, defaultProv] of Object.entries(DEFAULT_PROVIDERS)) {
         if (parsed[key]) {
-          const userModels = Array.isArray(parsed[key].models) ? parsed[key].models! : [];
-          // Preserve discovered models + guarantee default models are included
-          const mergedModels = Array.from(new Set([...defaultProv.models, ...userModels]));
+          const userModels = Array.isArray(parsed[key].models) && parsed[key].models!.length > 0
+            ? parsed[key].models!
+            : defaultProv.models;
           result[key] = {
             ...defaultProv,
             ...parsed[key],
-            models: mergedModels,
+            models: userModels,
           };
         }
       }
@@ -181,17 +194,21 @@ export interface ProviderState {
   activeModel: string;
   thinkingLevel: ThinkingLevel;
   ollamaStatus: "online" | "offline" | "checking" | "unknown";
+  lastSyncedAt: Record<string, number>;
+  isSyncing: Record<string, boolean>;
   preambles: PreamblePreset[];
   activePreambleId: string;
 
   setApiKey: (id: string, key: string) => void;
   setEndpoint: (id: string, endpoint: string) => void;
+  setOAuthClientId: (id: string, clientId: string) => void;
   setActiveProviderAndModel: (providerId: string, model: string) => void;
   setThinkingLevel: (level: ThinkingLevel) => void;
   syncKeysToBackend: () => Promise<void>;
   loadKeysFromSharedAuthFile: () => Promise<void>;
   testProviderKeyLive: (providerId: string, key: string) => Promise<{ success: boolean; message: string; latency?: number; models?: string[] }>;
   fetchProviderModels: (providerId: string) => Promise<string[]>;
+  startOAuthLogin: (providerId: string, customClientId?: string) => Promise<{ success: boolean; message: string }>;
   checkOllama: () => Promise<void>;
   savePreamble: (preset: PreamblePreset) => void;
   deletePreamble: (id: string) => void;
@@ -218,6 +235,8 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
   activeModel: initialActive.model,
   thinkingLevel: loadInitialThinkingLevel(),
   ollamaStatus: "unknown",
+  lastSyncedAt: {},
+  isSyncing: {},
   preambles: DEFAULT_PREAMBLES,
   activePreambleId: "default-coder",
 
@@ -314,21 +333,42 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
           { provider: providerId, key: cleanKey }
         );
         if (res.success && res.models && res.models.length > 0) {
+          const discovered = res.models;
           set((state) => {
             const current = state.providers[providerId];
             if (!current) return state;
-            const mergedModels = Array.from(new Set([...current.models, ...res.models!]));
             const updated = {
               ...state.providers,
               [providerId]: {
                 ...current,
-                models: mergedModels,
+                models: discovered,
+                isConfigured: true,
               },
             };
             try {
               localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
             } catch {}
-            return { providers: updated };
+
+            // Fallback active model if current model was pruned
+            const shouldFallback = state.activeProviderId === providerId && !discovered.includes(state.activeModel);
+            const fallbackModel = shouldFallback
+              ? (discovered.includes(current.defaultModel) ? current.defaultModel : discovered[0])
+              : state.activeModel;
+
+            if (fallbackModel !== state.activeModel) {
+              try {
+                localStorage.setItem(
+                  STORAGE_KEYS.ACTIVE_SELECTION,
+                  JSON.stringify({ provider: providerId, model: fallbackModel })
+                );
+              } catch {}
+            }
+
+            return {
+              providers: updated,
+              activeModel: fallbackModel,
+              lastSyncedAt: { ...state.lastSyncedAt, [providerId]: Date.now() },
+            };
           });
         }
         return { success: res.success, message: res.message, latency: res.latency_ms, models: res.models };
@@ -360,18 +400,37 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
             set((state) => {
               const current = state.providers[providerId];
               if (!current) return state;
-              const mergedModels = Array.from(new Set([...current.models, ...discoveredModels]));
               const updated = {
                 ...state.providers,
                 [providerId]: {
                   ...current,
-                  models: mergedModels,
+                  models: discoveredModels,
+                  isConfigured: true,
                 },
               };
               try {
                 localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
               } catch {}
-              return { providers: updated };
+
+              const shouldFallback = state.activeProviderId === providerId && !discoveredModels.includes(state.activeModel);
+              const fallbackModel = shouldFallback
+                ? (discoveredModels.includes(current.defaultModel) ? current.defaultModel : discoveredModels[0])
+                : state.activeModel;
+
+              if (fallbackModel !== state.activeModel) {
+                try {
+                  localStorage.setItem(
+                    STORAGE_KEYS.ACTIVE_SELECTION,
+                    JSON.stringify({ provider: providerId, model: fallbackModel })
+                  );
+                } catch {}
+              }
+
+              return {
+                providers: updated,
+                activeModel: fallbackModel,
+                lastSyncedAt: { ...state.lastSyncedAt, [providerId]: Date.now() },
+              };
             });
           }
           return {
@@ -394,44 +453,121 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
   },
 
   fetchProviderModels: async (providerId: string) => {
-    const prov = get().providers[providerId];
+    set((state) => ({
+      isSyncing: { ...state.isSyncing, [providerId]: true },
+    }));
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const res = await invoke<TestKeyResponse>("fetch_provider_models", { provider: providerId });
+          if (res.success && res.models && res.models.length > 0) {
+            const discovered = res.models;
+            set((state) => {
+              const current = state.providers[providerId];
+              if (!current) return state;
+              const updated = {
+                ...state.providers,
+                [providerId]: {
+                  ...current,
+                  models: discovered,
+                  isConfigured: true,
+                },
+              };
+              try {
+                localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+              } catch {}
+
+              const shouldFallback = state.activeProviderId === providerId && !discovered.includes(state.activeModel);
+              const fallbackModel = shouldFallback
+                ? (discovered.includes(current.defaultModel) ? current.defaultModel : discovered[0])
+                : state.activeModel;
+
+              if (fallbackModel !== state.activeModel) {
+                try {
+                  localStorage.setItem(
+                    STORAGE_KEYS.ACTIVE_SELECTION,
+                    JSON.stringify({ provider: providerId, model: fallbackModel })
+                  );
+                } catch {}
+              }
+
+              return {
+                providers: updated,
+                activeModel: fallbackModel,
+                lastSyncedAt: { ...state.lastSyncedAt, [providerId]: Date.now() },
+              };
+            });
+            return discovered;
+          }
+        } catch (err) {
+          console.warn("fetch_provider_models failed, falling back to key test:", err);
+        }
+      }
+      const prov = get().providers[providerId];
+      const key = prov?.apiKey || "";
+      if (key.trim()) {
+        const res = await get().testProviderKeyLive(providerId, key);
+        if (res.models && res.models.length > 0) {
+          return res.models;
+        }
+      }
+      return prov?.models || [];
+    } finally {
+      set((state) => ({
+        isSyncing: { ...state.isSyncing, [providerId]: false },
+      }));
+    }
+  },
+
+  startOAuthLogin: async (providerId: string, customClientId?: string) => {
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const res = await invoke<TestKeyResponse>("fetch_provider_models", { provider: providerId });
-        if (res.success && res.models && res.models.length > 0) {
-          set((state) => {
-            const current = state.providers[providerId];
-            if (!current) return state;
-            const mergedModels = Array.from(new Set([...current.models, ...res.models!]));
-            const updated = {
-              ...state.providers,
-              [providerId]: {
-                ...current,
-                models: mergedModels,
-              },
-            };
-            try {
-              localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
-            } catch {}
-            return { providers: updated };
-          });
-          return res.models;
-        }
-      } catch (err) {
-        console.warn("fetch_provider_models failed, falling back to key test:", err);
+        const msg = await invoke<string>("start_oauth_login", {
+          provider: providerId,
+          customClientId: customClientId?.trim() || null,
+        });
+        set((state) => {
+          const current = state.providers[providerId];
+          if (!current) return state;
+          const updated = {
+            ...state.providers,
+            [providerId]: {
+              ...current,
+              isConfigured: true,
+            },
+          };
+          try {
+            localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+          } catch {}
+          return { providers: updated };
+        });
+        await get().fetchProviderModels(providerId);
+        return { success: true, message: msg };
+      } catch (err: unknown) {
+        return { success: false, message: String(err) };
       }
     }
-    const key = prov?.apiKey || "";
-    if (key.trim()) {
-      const res = await get().testProviderKeyLive(providerId, key);
-      if (res.models && res.models.length > 0) {
-        return res.models;
-      }
-    }
-    return prov?.models || [];
+    return { success: false, message: "OAuth flow requires native desktop Tauri environment." };
   },
 
+  setOAuthClientId: (id, clientId) =>
+    set((state) => {
+      const current = state.providers[id];
+      if (!current) return state;
+      const updated = {
+        ...state.providers,
+        [id]: {
+          ...current,
+          oauthClientId: clientId.trim(),
+        },
+      };
+      try {
+        localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+      } catch {}
+      return { providers: updated };
+    }),
 
   setEndpoint: (id, endpoint) =>
     set((state) => {

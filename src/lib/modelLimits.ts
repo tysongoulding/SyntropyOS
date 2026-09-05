@@ -58,6 +58,11 @@ export function getModelContextLimit(modelName?: string, providerId?: string): M
     return { maxTokens: 32768, displayName: modelName || "mixtral-8x7b-32768", providerName: "Groq (Mistral)" };
   }
 
+  // xAI (SpaceX / Grok) Family
+  if (cleanModel.includes("grok")) {
+    return { maxTokens: 131072, displayName: modelName || "grok-2-1212", providerName: "xAI (SpaceX / Grok)" };
+  }
+
   // Ollama Local LLM
   if (providerId === "ollama") {
     return { maxTokens: 32768, displayName: modelName || "llama3.2 (Local)", providerName: "Ollama (Local LLM)" };
@@ -98,6 +103,11 @@ export function supportsThinking(modelName?: string, providerId?: string): boole
 
   // DeepSeek reasoning models
   if (clean.includes("r1") || clean.includes("reasoner")) {
+    return true;
+  }
+
+  // xAI Grok reasoning models
+  if (clean.includes("grok-3") || clean.includes("grok-reasoning")) {
     return true;
   }
 

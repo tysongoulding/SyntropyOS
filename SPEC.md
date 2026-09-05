@@ -95,6 +95,14 @@ This specification serves as the living checklist for features, architectural re
 
 ---
 
+### Phase 6: Multi-Provider Authentication, xAI Grok, Strict Dynamic Model Replacement & Hot Sync (v0.1.3)
+- [x] **xAI (SpaceX / Grok) Integration**: Hardware keystore vaulting (`"xai"`), live model discovery via `https://api.x.ai/v1/models`, SSE stream parsing with reasoning chunk support, and default model `grok-2-1212`.
+- [x] **Multi-Provider OAuth 2.0 PKCE**: Loopback port range fallback (`8989..=8995`) with dynamic `redirect_uri` for Google and OpenAI PKCE desktop login with optional custom client ID override.
+- [x] **Strict Dynamic Model Replacement**: Purging dead / legacy models immediately on API key / token validation or sync; auto-fallback to default flagship model if the active model is pruned.
+- [x] **Chat Dropup Hot Sync & Stale Probing**: Manual "↻ Sync" button and stale auto-probe (> 30 mins) in `ModelDropupPicker` updating live model lists in-place with animated spinner.
+
+---
+
 ## 🚀 Active Specification Items & User Backlog
 
 *Add your new feature requests, refinements, or bug reports below. When an AI agent completes an item and passes all tests, it will check the item as `[x]`.*

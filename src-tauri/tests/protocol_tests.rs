@@ -86,3 +86,14 @@ fn test_rpc_event_contract() {
     assert!(json.contains("\"type\":\"text_chunk\""));
     assert!(json.contains("\"content\":\"Hello Gemini\""));
 }
+
+#[tokio::test]
+async fn test_oauth_port_range_binding() {
+    use syntropy_os_lib::oauth::OAuthLoopback;
+    let res = OAuthLoopback::bind_in_range(8989, 8995).await;
+    assert!(res.is_ok());
+    let (_loopback, listener, port) = res.unwrap();
+    assert!(port >= 8989 && port <= 8995);
+    drop(listener);
+}
+

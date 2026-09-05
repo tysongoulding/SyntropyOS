@@ -59,13 +59,28 @@ impl OAuthLoopback {
         Self { addr }
     }
 
-    /// Listens for a single HTTP GET callback on 127.0.0.1:8989/oauth/callback
-    pub async fn listen_for_code(
-        &self,
+    /// Attempts to bind to an available port in the given inclusive range (e.g. 8989..=8995)
+    pub async fn bind_in_range(start_port: u16, end_port: u16) -> Result<(Self, TcpListener, u16), OAuthError> {
+        for port in start_port..=end_port {
+            let addr_str = format!("127.0.0.1:{}", port);
+            if let Ok(addr) = addr_str.parse::<SocketAddr>() {
+                if let Ok(listener) = TcpListener::bind(addr).await {
+                    return Ok((Self { addr }, listener, port));
+                }
+            }
+        }
+        Err(OAuthError::BindError(std::io::Error::new(
+            std::io::ErrorKind::AddrInUse,
+            format!("All ports in range {}-{} are occupied", start_port, end_port),
+        )))
+    }
+
+    /// Listens on an already bound TcpListener for a single authorization callback
+    pub async fn listen_on_listener(
+        listener: TcpListener,
         expected_state: &str,
         timeout_duration: std::time::Duration,
     ) -> Result<String, OAuthError> {
-        let listener = TcpListener::bind(self.addr).await?;
         let (tx, rx) = oneshot::channel();
         let state_to_match = expected_state.to_string();
 
@@ -94,7 +109,7 @@ impl OAuthLoopback {
 
                             if let (Some(code), Some(state)) = (params.get("code"), params.get("state")) {
                                 if state == &state_to_match {
-                                    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h2>SyntropyOS Authorization Successful!</h2><p>You can close this tab and return to the SyntropyOS app.</p><script>window.close();</script></body></html>";
+                                    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body style='font-family:system-ui;background:#0d1117;color:#c9d1d9;text-align:center;padding:40px;'><h2 style='color:#58a6ff;'>SyntropyOS Authorization Successful!</h2><p>You can close this tab and return to SyntropyOS.</p><script>window.close();</script></body></html>";
                                     let _ = stream.write_all(response.as_bytes()).await;
                                     let _ = tx.send(Ok(code.clone()));
                                     return;
@@ -121,4 +136,121 @@ impl OAuthLoopback {
             }
         }
     }
+
+    /// Listens for a single HTTP GET callback on 127.0.0.1:8989/oauth/callback
+    pub async fn listen_for_code(
+        &self,
+        expected_state: &str,
+        timeout_duration: std::time::Duration,
+    ) -> Result<String, OAuthError> {
+        let listener = TcpListener::bind(self.addr).await?;
+        Self::listen_on_listener(listener, expected_state, timeout_duration).await
+    }
 }
+
+pub const DEFAULT_GOOGLE_CLIENT_ID: &str = "1057421839841-syntropyos-desktop-local.apps.googleusercontent.com";
+pub const DEFAULT_OPENAI_CLIENT_ID: &str = "syntropyos-desktop-pkce";
+
+pub fn build_auth_url(
+    provider: &str,
+    session: &PkceSession,
+    port: u16,
+    custom_client_id: Option<&str>,
+) -> Result<String, OAuthError> {
+    let redirect_uri = format!("http://127.0.0.1:{}/oauth/callback", port);
+    match provider {
+        "google" => {
+            let client_id = custom_client_id.unwrap_or(DEFAULT_GOOGLE_CLIENT_ID);
+            let scope = "openid%20email%20https://www.googleapis.com/auth/generative-language";
+            Ok(format!(
+                "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=plain&access_type=offline&prompt=consent",
+                client_id, redirect_uri, scope, session.state, session.code_challenge
+            ))
+        }
+        "openai" => {
+            let client_id = custom_client_id.unwrap_or(DEFAULT_OPENAI_CLIENT_ID);
+            let scope = "model.read%20model.request";
+            Ok(format!(
+                "https://auth.openai.com/authorize?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=plain",
+                client_id, redirect_uri, scope, session.state, session.code_challenge
+            ))
+        }
+        _ => Err(OAuthError::AuthFailed(format!("OAuth not supported for {}", provider))),
+    }
+}
+
+pub async fn exchange_code_for_token(
+    provider: &str,
+    code: &str,
+    session: &PkceSession,
+    port: u16,
+    custom_client_id: Option<&str>,
+) -> Result<String, OAuthError> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| OAuthError::AuthFailed(e.to_string()))?;
+
+    let redirect_uri = format!("http://127.0.0.1:{}/oauth/callback", port);
+
+    match provider {
+        "google" => {
+            let client_id = custom_client_id.unwrap_or(DEFAULT_GOOGLE_CLIENT_ID);
+            let params = [
+                ("client_id", client_id),
+                ("code", code),
+                ("code_verifier", &session.code_verifier),
+                ("grant_type", "authorization_code"),
+                ("redirect_uri", &redirect_uri),
+            ];
+
+            let resp = client
+                .post("https://oauth2.googleapis.com/token")
+                .form(&params)
+                .send()
+                .await
+                .map_err(|e| OAuthError::AuthFailed(e.to_string()))?;
+
+            if resp.status().is_success() {
+                let data: serde_json::Value = resp.json().await.map_err(|e| OAuthError::AuthFailed(e.to_string()))?;
+                let token = data["access_token"]
+                    .as_str()
+                    .ok_or_else(|| OAuthError::AuthFailed("No access_token in response".into()))?;
+                Ok(token.to_string())
+            } else {
+                let body = resp.text().await.unwrap_or_default();
+                Err(OAuthError::AuthFailed(format!("Google token exchange failed: {}", body)))
+            }
+        }
+        "openai" => {
+            let client_id = custom_client_id.unwrap_or(DEFAULT_OPENAI_CLIENT_ID);
+            let params = [
+                ("client_id", client_id),
+                ("code", code),
+                ("code_verifier", &session.code_verifier),
+                ("grant_type", "authorization_code"),
+                ("redirect_uri", &redirect_uri),
+            ];
+
+            let resp = client
+                .post("https://auth.openai.com/oauth/token")
+                .form(&params)
+                .send()
+                .await
+                .map_err(|e| OAuthError::AuthFailed(e.to_string()))?;
+
+            if resp.status().is_success() {
+                let data: serde_json::Value = resp.json().await.map_err(|e| OAuthError::AuthFailed(e.to_string()))?;
+                let token = data["access_token"]
+                    .as_str()
+                    .ok_or_else(|| OAuthError::AuthFailed("No access_token in response".into()))?;
+                Ok(token.to_string())
+            } else {
+                let body = resp.text().await.unwrap_or_default();
+                Err(OAuthError::AuthFailed(format!("OpenAI token exchange failed: {}", body)))
+            }
+        }
+        _ => Err(OAuthError::AuthFailed(format!("OAuth exchange not supported for {}", provider))),
+    }
+}
+

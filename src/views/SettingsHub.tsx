@@ -7,7 +7,7 @@ export const SettingsHub: React.FC = () => {
   const { systemStatus, apiKeys, setApiKey, connectedIntegrations } = useSettingsStore();
   const [savedProvider, setSavedProvider] = useState<string | null>(null);
 
-  const handleSaveKey = async (provider: "gemini" | "anthropic" | "openai" | "groq") => {
+  const handleSaveKey = async (provider: "gemini" | "anthropic" | "openai" | "groq" | "xai") => {
     try {
       await invoke("execute_command", {
         cmd: {
@@ -146,6 +146,32 @@ export const SettingsHub: React.FC = () => {
               />
               <button
                 onClick={() => handleSaveKey("groq")}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center gap-1"
+              >
+                <Save className="w-3.5 h-3.5" /> Save
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-300 font-medium block mb-1.5 flex items-center justify-between">
+              <span>xAI (SpaceX / Grok) API Key</span>
+              {savedProvider === "xai" && (
+                <span className="text-[10px] text-emerald-400 flex items-center gap-0.5">
+                  <Check className="w-3 h-3" /> Saved
+                </span>
+              )}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={apiKeys.xai}
+                onChange={(e) => setApiKey("xai", e.target.value)}
+                placeholder="xai-..."
+                className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none"
+              />
+              <button
+                onClick={() => handleSaveKey("xai")}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center gap-1"
               >
                 <Save className="w-3.5 h-3.5" /> Save

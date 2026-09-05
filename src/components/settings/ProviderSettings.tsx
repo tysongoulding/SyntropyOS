@@ -32,10 +32,12 @@ export function ProviderSettings() {
     setActiveProviderAndModel,
     testProviderKeyLive,
     fetchProviderModels,
+    startOAuthLogin,
   } = useProviderStore();
   const { addToast } = useToastStore();
   const { send } = useRhoEngine();
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [oauthLoading, setOauthLoading] = useState<Record<string, boolean>>({});
   const [testStatuses, setTestStatuses] = useState<
     Record<string, { status: "idle" | "testing" | "success" | "error"; message?: string; latency?: number }>
   >({});
@@ -50,6 +52,18 @@ export function ProviderSettings() {
       addToast(`Saved ${providerName} API Key to Vault & Synced with Engine`, "success");
     } else {
       addToast(`Cleared ${providerName} API Key`, "info");
+    }
+  };
+
+  const handleStartOAuth = async (providerId: string, customClientId?: string) => {
+    setOauthLoading((prev) => ({ ...prev, [providerId]: true }));
+    addToast(`Launching browser OAuth login for ${providers[providerId]?.name || providerId}...`, "info");
+    const res = await startOAuthLogin(providerId, customClientId);
+    setOauthLoading((prev) => ({ ...prev, [providerId]: false }));
+    if (res.success) {
+      addToast(`✓ ${res.message}`, "success");
+    } else {
+      addToast(`✗ OAuth login failed: ${res.message}`, "error");
     }
   };
 
@@ -105,7 +119,6 @@ export function ProviderSettings() {
   };
 
   const apiKeyProviders = Object.values(providers).filter((p) => p.type === "api_key");
-  const oauthProviders = Object.values(providers).filter((p) => p.type === "oauth");
   const localProvider = providers.ollama;
 
   return (
@@ -130,6 +143,9 @@ export function ProviderSettings() {
               isActive={activeProviderId.toLowerCase() === prov.id.toLowerCase()}
               showKey={!!showKeys[prov.id]}
               testState={testStatuses[prov.id]}
+              canOAuth={prov.id === "gemini" || prov.id === "openai"}
+              oauthLoading={!!oauthLoading[prov.id]}
+              onStartOAuth={(cid) => handleStartOAuth(prov.id, cid)}
               onToggleShow={() => toggleShowKey(prov.id)}
               onKeySave={(k) => handleKeySave(prov.id, prov.name, k)}
               onTestKey={(k) => handleTestKey(prov, k)}
@@ -223,25 +239,56 @@ export function ProviderSettings() {
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {oauthProviders.map((prov) => (
-            <div
-              key={prov.id}
-              className="p-3.5 bg-[#161b22] border border-[#30363d] rounded-xl flex items-center justify-between"
-            >
-              <div>
-                <div className="font-semibold text-white text-xs">{prov.name}</div>
-                <div className="text-[10px] text-[#8b949e]">Device Code / PKCE Flow</div>
+          <div className="p-3.5 bg-[#161b22] border border-[#30363d] rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-white text-xs">Google Account (OAuth PKCE)</div>
+              <div className="text-[10px] text-[#8b949e]">
+                Browser loopback {providers.gemini?.isConfigured && "• Configured"}
               </div>
-
-              <button
-                onClick={() => addToast(`Initiating OAuth PKCE handshake for ${prov.name}`, "info")}
-                className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-white font-medium text-[11px] transition"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Authenticate</span>
-              </button>
             </div>
-          ))}
+
+            <button
+              onClick={() => handleStartOAuth("gemini")}
+              disabled={oauthLoading["gemini"]}
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/60 text-purple-300 font-medium text-[11px] transition disabled:opacity-50"
+            >
+              <LogIn className={`w-3.5 h-3.5 ${oauthLoading["gemini"] ? "animate-spin text-purple-400" : ""}`} />
+              <span>{oauthLoading["gemini"] ? "Authorizing..." : "Authenticate"}</span>
+            </button>
+          </div>
+
+          <div className="p-3.5 bg-[#161b22] border border-[#30363d] rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-white text-xs">OpenAI / ChatGPT (OAuth PKCE)</div>
+              <div className="text-[10px] text-[#8b949e]">
+                Browser loopback {providers.openai?.isConfigured && "• Configured"}
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleStartOAuth("openai")}
+              disabled={oauthLoading["openai"]}
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/60 text-purple-300 font-medium text-[11px] transition disabled:opacity-50"
+            >
+              <LogIn className={`w-3.5 h-3.5 ${oauthLoading["openai"] ? "animate-spin text-purple-400" : ""}`} />
+              <span>{oauthLoading["openai"] ? "Authorizing..." : "Authenticate"}</span>
+            </button>
+          </div>
+
+          <div className="p-3.5 bg-[#161b22] border border-[#30363d] rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-white text-xs">GitHub Copilot (Device Auth)</div>
+              <div className="text-[10px] text-[#8b949e]">Device Code Flow</div>
+            </div>
+
+            <button
+              onClick={() => addToast("GitHub Copilot device auth initiation", "info")}
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-white font-medium text-[11px] transition"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Authenticate</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -253,6 +300,9 @@ interface ApiKeyCardProps {
   isActive: boolean;
   showKey: boolean;
   testState?: { status: "idle" | "testing" | "success" | "error"; message?: string; latency?: number };
+  canOAuth?: boolean;
+  oauthLoading?: boolean;
+  onStartOAuth?: (customClientId?: string) => Promise<void>;
   onToggleShow: () => void;
   onKeySave: (key: string) => void;
   onTestKey: (key: string) => void;
@@ -265,6 +315,9 @@ function ApiKeyCard({
   isActive,
   showKey,
   testState,
+  canOAuth,
+  oauthLoading,
+  onStartOAuth,
   onToggleShow,
   onKeySave,
   onTestKey,
@@ -273,6 +326,8 @@ function ApiKeyCard({
 }: ApiKeyCardProps) {
   const [currentVal, setCurrentVal] = useState(provider.apiKey || "");
   const [showModels, setShowModels] = useState(false);
+  const [showCustomClientId, setShowCustomClientId] = useState(false);
+  const [customClientId, setCustomClientId] = useState(provider.oauthClientId || "");
 
   const handleSave = () => {
     onKeySave(currentVal);
@@ -357,6 +412,46 @@ function ApiKeyCard({
           <span>{testState?.status === "testing" ? "Testing..." : "Test"}</span>
         </button>
       </div>
+
+      {/* Optional OAuth PKCE Connect for Google / OpenAI */}
+      {canOAuth && (
+        <div className="pt-2 border-t border-[#30363d]/60 space-y-1.5">
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-[#8b949e]">Or authenticate with OAuth 2.0 PKCE:</span>
+            <button
+              type="button"
+              onClick={() => setShowCustomClientId(!showCustomClientId)}
+              className="text-[#58a6ff] hover:underline"
+            >
+              {showCustomClientId ? "Hide Client ID" : "Custom Client ID"}
+            </button>
+          </div>
+
+          {showCustomClientId && (
+            <input
+              type="text"
+              value={customClientId}
+              onChange={(e) => setCustomClientId(e.target.value)}
+              placeholder="Enter Custom OAuth Client ID..."
+              className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-1 font-mono text-[10px] text-white placeholder-[#484f58] focus:outline-none focus:border-purple-500"
+            />
+          )}
+
+          <button
+            type="button"
+            onClick={() => onStartOAuth?.(customClientId)}
+            disabled={oauthLoading}
+            className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-lg bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/60 text-purple-300 hover:text-purple-200 transition text-[11px] font-medium disabled:opacity-50"
+          >
+            <LogIn className={`w-3.5 h-3.5 ${oauthLoading ? "animate-spin text-purple-400" : ""}`} />
+            <span>
+              {oauthLoading
+                ? "Connecting via Browser..."
+                : `Sign in with ${provider.id === "gemini" ? "Google" : "OpenAI"} OAuth`}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Test feedback banner */}
       {testState && testState.status !== "idle" && (

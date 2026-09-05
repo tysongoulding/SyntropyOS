@@ -9,13 +9,14 @@ interface SettingsStore {
     anthropic: string;
     openai: string;
     groq: string;
+    xai: string;
   };
   connectedIntegrations: {
     googleWorkspace: boolean;
     microsoft365: boolean;
   };
   setSystemStatus: (status: SystemStatus) => void;
-  setApiKey: (provider: "gemini" | "anthropic" | "openai" | "groq", key: string) => void;
+  setApiKey: (provider: "gemini" | "anthropic" | "openai" | "groq" | "xai", key: string) => void;
   setIntegrationStatus: (provider: "googleWorkspace" | "microsoft365", connected: boolean) => void;
 }
 
@@ -34,6 +35,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     anthropic: "••••••••••••••••",
     openai: "",
     groq: "",
+    xai: "",
   },
   connectedIntegrations: {
     googleWorkspace: true,

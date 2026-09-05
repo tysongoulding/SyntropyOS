@@ -11,7 +11,7 @@ use commands::{
     close_window, execute_command, fetch_provider_models, get_blackboard_manifest, get_blackboard_presentation,
     get_prompt_config, get_saved_auth_keys, load_lota_settings, minimize_window, open_external_url,
     open_local_path, save_custom_prompt, save_lota_settings, send_rpc_command, start_drag_window,
-    sync_provider_keys, test_provider_key, toggle_maximize_window, verify_invariants, AppState,
+    start_oauth_login, sync_provider_keys, test_provider_key, toggle_maximize_window, verify_invariants, AppState,
 };
 use keystore::SecureKeystore;
 use paths::AppPaths;
@@ -54,6 +54,7 @@ pub fn run() {
             get_saved_auth_keys,
             test_provider_key,
             fetch_provider_models,
+            start_oauth_login,
             load_lota_settings,
             save_lota_settings,
             send_rpc_command,

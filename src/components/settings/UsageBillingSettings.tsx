@@ -15,6 +15,7 @@ export function UsageBillingSettings() {
   const modelRates = [
     { model: "Claude 3.7 Sonnet", provider: "Anthropic", input: "$3.00 / 1M", output: "$15.00 / 1M", status: "Active" },
     { model: "GPT-4o", provider: "OpenAI", input: "$2.50 / 1M", output: "$10.00 / 1M", status: "Available" },
+    { model: "Grok 2", provider: "xAI (SpaceX)", input: "$2.00 / 1M", output: "$10.00 / 1M", status: "Available" },
     { model: "Gemini 2.0 Flash", provider: "Google", input: "$0.10 / 1M", output: "$0.40 / 1M", status: "Available" },
     { model: "DeepSeek V3", provider: "DeepSeek", input: "$0.14 / 1M", output: "$0.28 / 1M", status: "Available" },
     { model: "Llama 3.3 70B", provider: "Ollama (Local)", input: "Free ($0.00)", output: "Free ($0.00)", status: "Local Engine" },

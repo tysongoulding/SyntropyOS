@@ -55,6 +55,13 @@ const PROVIDERS: ProviderItem[] = [
     type: "api_key",
   },
   {
+    id: "xai",
+    name: "xAI (SpaceX / Grok)",
+    defaultModel: "grok-2-1212",
+    models: ["grok-2-1212", "grok-2-vision-1212", "grok-beta"],
+    type: "api_key",
+  },
+  {
     id: "deepseek",
     name: "DeepSeek",
     defaultModel: "deepseek-chat",

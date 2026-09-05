@@ -77,7 +77,7 @@ pub async fn get_saved_auth_keys(
     state: State<'_, AppState>,
 ) -> Result<HashMap<String, String>, String> {
     let mut map = HashMap::new();
-    let providers = ["gemini", "anthropic", "openai", "deepseek", "groq"];
+    let providers = ["gemini", "anthropic", "openai", "deepseek", "groq", "xai"];
     for p in providers {
         if let Ok(Some(secret)) = state.keystore.get_secret(p).await {
             map.insert(p.to_string(), secret.to_string());
@@ -423,6 +423,66 @@ pub async fn test_provider_key(
                 }),
             }
         }
+        "xai" => {
+            let url = "https://api.x.ai/v1/models";
+            match client
+                .get(url)
+                .header("Authorization", format!("Bearer {}", clean_key))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    let status = resp.status();
+                    if status.is_success() {
+                        let body = resp.text().await.unwrap_or_default();
+                        let mut models = Vec::new();
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
+                                for item in arr {
+                                    if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
+                                        if id.contains("grok") && !id.contains("embedding") {
+                                            models.push(id.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if models.is_empty() {
+                            models = vec![
+                                "grok-2-1212".to_string(),
+                                "grok-2-vision-1212".to_string(),
+                                "grok-beta".to_string(),
+                            ];
+                        }
+                        Ok(TestKeyResponse {
+                            success: true,
+                            latency_ms: latency,
+                            message: format!("xAI Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            models,
+                        })
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        let error_msg = serde_json::from_str::<serde_json::Value>(&body)
+                            .ok()
+                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        Ok(TestKeyResponse {
+                            success: false,
+                            latency_ms: latency,
+                            message: error_msg,
+                            models: Vec::new(),
+                        })
+                    }
+                }
+                Err(err) => Ok(TestKeyResponse {
+                    success: false,
+                    latency_ms: start.elapsed().as_millis() as u64,
+                    message: err.to_string(),
+                    models: Vec::new(),
+                }),
+            }
+        }
         _ => Ok(TestKeyResponse {
             success: true,
             latency_ms: 5,
@@ -431,6 +491,7 @@ pub async fn test_provider_key(
         }),
     }
 }
+
 
 #[tauri::command]
 pub async fn fetch_provider_models(
@@ -450,6 +511,59 @@ pub async fn fetch_provider_models(
     };
     test_provider_key(provider, key).await
 }
+
+#[tauri::command]
+pub async fn start_oauth_login(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    provider: String,
+    custom_client_id: Option<String>,
+) -> Result<String, String> {
+    use crate::oauth::{build_auth_url, exchange_code_for_token, OAuthLoopback, PkceSession};
+    use tauri_plugin_opener::OpenerExt;
+
+    let (_loopback, listener, port) = OAuthLoopback::bind_in_range(8989, 8995)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let session = PkceSession::new(&provider);
+    let auth_url = build_auth_url(
+        &provider,
+        &session,
+        port,
+        custom_client_id.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Open URL in system default browser
+    app.opener().open_url(&auth_url, None::<&str>).map_err(|e| e.to_string())?;
+
+    // Await callback code on loopback with 120s timeout
+    let code = OAuthLoopback::listen_on_listener(
+        listener,
+        &session.state,
+        std::time::Duration::from_secs(120),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Exchange code for token
+    let token = exchange_code_for_token(
+        &provider,
+        &code,
+        &session,
+        port,
+        custom_client_id.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Store in secure hardware keystore
+    state.keystore.set_secret(&provider, &token).await.map_err(|e| e.to_string())?;
+
+    Ok(format!("{} OAuth authorization successful", provider))
+}
+
 
 
 #[tauri::command]
@@ -493,11 +607,21 @@ pub async fn send_rpc_command(
 
     if cmd_type == "prompt" {
         let message = request.get("message").and_then(|v| v.as_str()).unwrap_or("");
+        let requested_provider = request
+            .get("provider")
+            .and_then(|v| v.as_str())
+            .filter(|p| !p.is_empty())
+            .unwrap_or("gemini");
         let requested_model = request
             .get("model")
             .and_then(|v| v.as_str())
             .filter(|m| !m.is_empty())
-            .unwrap_or("gemini-2.5-flash");
+            .unwrap_or(match requested_provider {
+                "openai" => "gpt-4o",
+                "anthropic" => "claude-3-7-sonnet-20250219",
+                "xai" => "grok-2-1212",
+                _ => "gemini-2.5-flash",
+            });
         let ws_id = format!("ws-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
 
         // 1. Emit turn_start
@@ -509,58 +633,175 @@ pub async fn send_rpc_command(
             },
         );
 
-        // 2. Retrieve Gemini API key from hardware Keystore
-        let gemini_key = state.keystore.get_secret("gemini").await.ok().flatten();
+        // 2. Retrieve key/token from hardware Keystore
+        let provider_key = state.keystore.get_secret(requested_provider).await.ok().flatten();
 
-        let full_response = if let Some(key) = gemini_key {
-            let client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(60))
-                .build()
-                .unwrap_or_default();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .unwrap_or_default();
 
-            let url = format!(
-                "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-                requested_model,
-                key.as_str()
-            );
+        let (full_response, reasoning_text) = if let Some(key) = provider_key {
+            match requested_provider {
+                "gemini" => {
+                    let url = format!(
+                        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                        requested_model,
+                        key.as_str()
+                    );
+                    let body = serde_json::json!({
+                        "contents": [
+                            {
+                                "role": "user",
+                                "parts": [{ "text": message }]
+                            }
+                        ]
+                    });
 
-            let body = serde_json::json!({
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [{ "text": message }]
-                    }
-                ]
-            });
-
-            match client.post(&url).json(&body).send().await {
-                Ok(resp) => {
-                    let status = resp.status();
-                    if status.is_success() {
-                        let data: serde_json::Value = resp.json().await.unwrap_or_default();
-                        data["candidates"][0]["content"]["parts"][0]["text"]
-                            .as_str()
-                            .unwrap_or("No response content generated from Gemini.")
-                            .to_string()
-                    } else {
-                        let err_body = resp.text().await.unwrap_or_default();
-                        let msg = serde_json::from_str::<serde_json::Value>(&err_body)
-                            .ok()
-                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
-                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
-                        format!("⚠️ Google Gemini API Error: {}", msg)
+                    match client.post(&url).json(&body).send().await {
+                        Ok(resp) => {
+                            let status = resp.status();
+                            if status.is_success() {
+                                let data: serde_json::Value = resp.json().await.unwrap_or_default();
+                                let text = data["candidates"][0]["content"]["parts"][0]["text"]
+                                    .as_str()
+                                    .unwrap_or("No response content generated from Gemini.")
+                                    .to_string();
+                                (text, String::new())
+                            } else {
+                                let err_body = resp.text().await.unwrap_or_default();
+                                let msg = serde_json::from_str::<serde_json::Value>(&err_body)
+                                    .ok()
+                                    .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                                    .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                                (format!("⚠️ Google Gemini API Error: {}", msg), String::new())
+                            }
+                        }
+                        Err(e) => (format!("⚠️ Google Gemini Connection Error: {}", e), String::new()),
                     }
                 }
-                Err(e) => format!("⚠️ Google Gemini Connection Error: {}", e),
+                "openai" | "xai" => {
+                    let endpoint = if requested_provider == "xai" {
+                        "https://api.x.ai/v1/chat/completions"
+                    } else {
+                        "https://api.openai.com/v1/chat/completions"
+                    };
+                    let body = serde_json::json!({
+                        "model": requested_model,
+                        "messages": [{ "role": "user", "content": message }]
+                    });
+
+                    match client
+                        .post(endpoint)
+                        .header("Authorization", format!("Bearer {}", key.as_str()))
+                        .json(&body)
+                        .send()
+                        .await
+                    {
+                        Ok(resp) => {
+                            let status = resp.status();
+                            if status.is_success() {
+                                let data: serde_json::Value = resp.json().await.unwrap_or_default();
+                                let text = data["choices"][0]["message"]["content"]
+                                    .as_str()
+                                    .unwrap_or("No response generated.")
+                                    .to_string();
+                                let reasoning = data["choices"][0]["message"]["reasoning_content"]
+                                    .as_str()
+                                    .unwrap_or("")
+                                    .to_string();
+                                (text, reasoning)
+                            } else {
+                                let err_body = resp.text().await.unwrap_or_default();
+                                let msg = serde_json::from_str::<serde_json::Value>(&err_body)
+                                    .ok()
+                                    .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                                    .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                                (format!("⚠️ {} API Error: {}", requested_provider.to_uppercase(), msg), String::new())
+                            }
+                        }
+                        Err(e) => (format!("⚠️ {} Connection Error: {}", requested_provider.to_uppercase(), e), String::new()),
+                    }
+                }
+                "anthropic" => {
+                    let endpoint = "https://api.anthropic.com/v1/messages";
+                    let body = serde_json::json!({
+                        "model": requested_model,
+                        "max_tokens": 4096,
+                        "messages": [{ "role": "user", "content": message }]
+                    });
+
+                    match client
+                        .post(endpoint)
+                        .header("x-api-key", key.as_str())
+                        .header("anthropic-version", "2023-06-01")
+                        .json(&body)
+                        .send()
+                        .await
+                    {
+                        Ok(resp) => {
+                            let status = resp.status();
+                            if status.is_success() {
+                                let data: serde_json::Value = resp.json().await.unwrap_or_default();
+                                let mut text = String::new();
+                                let mut reasoning = String::new();
+                                if let Some(blocks) = data["content"].as_array() {
+                                    for b in blocks {
+                                        if b["type"] == "text" {
+                                            if let Some(t) = b["text"].as_str() {
+                                                text.push_str(t);
+                                            }
+                                        } else if b["type"] == "thinking" {
+                                            if let Some(th) = b["thinking"].as_str() {
+                                                reasoning.push_str(th);
+                                            }
+                                        }
+                                    }
+                                }
+                                (text, reasoning)
+                            } else {
+                                let err_body = resp.text().await.unwrap_or_default();
+                                let msg = serde_json::from_str::<serde_json::Value>(&err_body)
+                                    .ok()
+                                    .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                                    .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                                (format!("⚠️ Anthropic API Error: {}", msg), String::new())
+                            }
+                        }
+                        Err(e) => (format!("⚠️ Anthropic Connection Error: {}", e), String::new()),
+                    }
+                }
+                _ => (
+                    format!("⚠️ Provider {} not configured for native execution.", requested_provider),
+                    String::new(),
+                ),
             }
         } else {
-            format!(
-                "⚠️ No Google Gemini API key configured in Keystore.\n\nPlease open Settings -> Cloud Providers & API Keys and save your Gemini API key to activate live inference.\n\n(Local echo: \"{}\")",
-                message
+            (
+                format!(
+                    "⚠️ No credentials configured for {} in Keystore.\n\nPlease open Settings -> Cloud Providers & API Keys and configure your {} API key or OAuth session to activate live inference.\n\n(Local echo: \"{}\")",
+                    requested_provider.to_uppercase(),
+                    requested_provider,
+                    message
+                ),
+                String::new(),
             )
         };
 
-        // 3. Stream text chunks
+        // 3a. Stream reasoning chunks if present
+        if !reasoning_text.is_empty() {
+            for chunk in reasoning_text.split_inclusive(' ') {
+                let _ = app.emit(
+                    "rho://event",
+                    RpcEvent::ReasoningChunk {
+                        content: chunk.to_string(),
+                    },
+                );
+                tokio::time::sleep(tokio::time::Duration::from_millis(8)).await;
+            }
+        }
+
+        // 3b. Stream text chunks
         for chunk in full_response.split_inclusive(' ') {
             let _ = app.emit(
                 "rho://event",
@@ -568,8 +809,9 @@ pub async fn send_rpc_command(
                     content: chunk.to_string(),
                 },
             );
-            tokio::time::sleep(tokio::time::Duration::from_millis(15)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(12)).await;
         }
+
 
         // 4. Emit turn_end
         let _ = app.emit(
