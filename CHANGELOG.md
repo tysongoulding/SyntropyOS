@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.0](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.3...v0.2.0) (2026-09-05)
+
+### Features
+
+* **customise:** revamp Plugins tab with dense OAuth integrations and checkmark status pills ([0710a94](https://github.com/tysongoulding/SyntropyOS/commit/0710a945295d5e7ab902d21b9eeb8f536978740e))
+* **oauth:** add PKCE loopback authentication for Google Workspace (Gmail, Drive, Calendar, Docs, Sheets, Slides) and Atlassian (Jira & Confluence)
+* **editor:** add Cursor-style agent and categorized model pickers with Gemini 3.x/2.x support ([ba13323](https://github.com/tysongoulding/SyntropyOS/commit/ba13323c600a3cc0030597498c7d2ac167983133))
+* **navigation:** reorder Customise tab to auto-open to Plugins by default and relocate Token Usage to final position
+* **keystore:** encrypted token storage for Granola AI Notes and external developer integrations
+
 ## [0.1.3](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.2...v0.1.3) (2026-09-05)
 
 
