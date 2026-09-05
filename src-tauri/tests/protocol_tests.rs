@@ -45,3 +45,15 @@ fn test_protocol_event_serialization() {
         _ => panic!("Wrong variant deserialized"),
     }
 }
+
+#[test]
+fn test_window_config() {
+    let conf = r##"{
+        "title": "SyntropyOS",
+        "theme": "Dark",
+        "backgroundColor": "#0d1117"
+    }"##;
+    let win: tauri::utils::config::WindowConfig = serde_json::from_str(conf).unwrap();
+    assert_eq!(win.theme, Some(tauri::Theme::Dark));
+    assert_eq!(win.background_color, Some(tauri::window::Color(13, 17, 23, 255)));
+}

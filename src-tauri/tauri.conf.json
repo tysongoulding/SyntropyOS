@@ -5,7 +5,7 @@
   "identifier": "com.syntropyos.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1425",
+    "devUrl": "http://127.0.0.1:1425",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
@@ -20,7 +20,9 @@
         "resizable": true,
         "decorations": false,
         "transparent": false,
-        "center": true
+        "center": true,
+        "theme": "Dark",
+        "backgroundColor": "#0d1117"
       }
     ],
     "security": {

@@ -7,7 +7,7 @@ export default defineConfig(async () => ({
   plugins: [react()],
   clearScreen: false,
   server: {
-    host: "0.0.0.0",
+    host: process.env.TAURI_DEV_HOST || "127.0.0.1",
     port: 1425,
     strictPort: true,
   },
