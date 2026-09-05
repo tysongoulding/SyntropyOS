@@ -15,7 +15,7 @@ import {
   Wrench,
   ListTodo,
   GitBranch,
-  Cpu,
+  Key,
   Palette,
   CreditCard,
 } from "lucide-react";
@@ -30,7 +30,7 @@ export function SettingsHubView() {
     { id: "tools", label: "Dynamic Tools", icon: Wrench },
     { id: "plans", label: "Plan Tracker", icon: ListTodo },
     { id: "sessions", label: "Session DAG", icon: GitBranch },
-    { id: "providers", label: "Providers & Models", icon: Cpu },
+    { id: "providers", label: "API or OAuth", icon: Key },
     { id: "theme", label: "Theme & Colors", icon: Palette },
     { id: "billing", label: "Usage & Billing", icon: CreditCard },
   ];

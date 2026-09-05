@@ -73,6 +73,12 @@ export function ProviderSettings() {
     addToast(`${prov.name} (${prov.defaultModel}) is now your active AI engine`, "success");
   };
 
+  const handleSelectModel = async (prov: ProviderConfig, modelName: string) => {
+    setActiveProviderAndModel(prov.id, modelName);
+    await send({ type: "set_model", provider: prov.id, model: modelName });
+    addToast(`${prov.name}: Active model set to ${modelName}`, "success");
+  };
+
   const handleTestKey = async (provider: ProviderConfig, key: string) => {
     const cleanKey = key.trim();
     if (!cleanKey) {
@@ -123,12 +129,12 @@ export function ProviderSettings() {
 
   return (
     <div className="space-y-6">
-      {/* API Key Providers */}
+      {/* API Key or OAuth Providers */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-white uppercase tracking-wider flex items-center space-x-1.5">
             <Key className="w-3.5 h-3.5 text-[#58a6ff]" />
-            <span>Cloud Providers & API Keys</span>
+            <span>API or OAuth Providers</span>
           </h3>
           <span className="text-[11px] text-[#8b949e]">
             Active: <strong className="text-white font-mono">{activeProviderId}</strong> ({activeModel})
@@ -141,6 +147,7 @@ export function ProviderSettings() {
               key={prov.id}
               provider={prov}
               isActive={activeProviderId.toLowerCase() === prov.id.toLowerCase()}
+              activeModel={activeModel}
               showKey={!!showKeys[prov.id]}
               testState={testStatuses[prov.id]}
               canOAuth={prov.id === "gemini" || prov.id === "openai"}
@@ -151,6 +158,7 @@ export function ProviderSettings() {
               onTestKey={(k) => handleTestKey(prov, k)}
               onSyncModels={() => handleSyncModels(prov)}
               onSetActive={() => handleSetActive(prov)}
+              onSelectModel={(m) => handleSelectModel(prov, m)}
             />
           ))}
         </div>
@@ -218,14 +226,25 @@ export function ProviderSettings() {
 
           {localProvider.models.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {localProvider.models.map((m) => (
-                <span
-                  key={m}
-                  className="bg-[#0d1117] text-[#8b949e] border border-[#30363d] px-2 py-0.5 rounded text-[10px] font-mono"
-                >
-                  {m}
-                </span>
-              ))}
+              {localProvider.models.map((m) => {
+                const isSelected = activeProviderId === "ollama" && activeModel === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => handleSelectModel(localProvider, m)}
+                    className={`font-mono text-[10px] px-2 py-0.5 rounded border transition flex items-center space-x-1 ${
+                      isSelected
+                        ? "bg-blue-600/30 border-blue-500 text-blue-300 font-semibold shadow-xs"
+                        : "bg-[#0d1117] text-[#8b949e] border-[#30363d] hover:text-white hover:border-[#484f58]"
+                    }`}
+                    title={`Click to set ${m} as active model`}
+                  >
+                    <span>{m}</span>
+                    {isSelected && <Check className="w-2.5 h-2.5 text-blue-400" />}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -298,6 +317,7 @@ export function ProviderSettings() {
 interface ApiKeyCardProps {
   provider: ProviderConfig;
   isActive: boolean;
+  activeModel?: string;
   showKey: boolean;
   testState?: { status: "idle" | "testing" | "success" | "error"; message?: string; latency?: number };
   canOAuth?: boolean;
@@ -308,11 +328,13 @@ interface ApiKeyCardProps {
   onTestKey: (key: string) => void;
   onSyncModels: () => void;
   onSetActive: () => void;
+  onSelectModel?: (model: string) => void;
 }
 
 function ApiKeyCard({
   provider,
   isActive,
+  activeModel,
   showKey,
   testState,
   canOAuth,
@@ -323,6 +345,7 @@ function ApiKeyCard({
   onTestKey,
   onSyncModels,
   onSetActive,
+  onSelectModel,
 }: ApiKeyCardProps) {
   const [currentVal, setCurrentVal] = useState(provider.apiKey || "");
   const [showModels, setShowModels] = useState(false);
@@ -505,14 +528,25 @@ function ApiKeyCard({
       {showModels && (
         <div className="bg-[#0d1117] border border-[#30363d] rounded-lg p-2 max-h-36 overflow-y-auto space-y-1">
           <div className="flex flex-wrap gap-1">
-            {provider.models.map((m) => (
-              <span
-                key={m}
-                className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-[#161b22] border border-[#30363d] text-[#c9d1d9]"
-              >
-                {m}
-              </span>
-            ))}
+            {provider.models.map((m) => {
+              const isSelected = isActive && activeModel === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onSelectModel?.(m)}
+                  className={`font-mono text-[9px] px-2 py-0.5 rounded border transition flex items-center space-x-1 ${
+                    isSelected
+                      ? "bg-blue-600/30 border-blue-500 text-blue-300 font-semibold shadow-xs"
+                      : "bg-[#161b22] border-[#30363d] text-[#c9d1d9] hover:border-[#484f58] hover:text-white"
+                  }`}
+                  title={`Click to set ${m} as active model`}
+                >
+                  <span>{m}</span>
+                  {isSelected && <Check className="w-2.5 h-2.5 text-blue-400" />}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
