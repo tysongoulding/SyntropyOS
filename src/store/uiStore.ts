@@ -21,12 +21,12 @@ export type SettingsTab =
   | "billing";
 
 export type CustomiseTab =
-  | "tokens"
+  | "plugins"
   | "rules"
   | "personas"
   | "skills"
   | "mcps"
-  | "plugins";
+  | "tokens";
 
 export type WorkbenchTab = "diff" | "thinking" | "file" | "json" | "usage";
 
@@ -72,7 +72,7 @@ export const useUiStore = create<UiState>((set) => ({
 
   activeView: "chat",
   activeSettingsTab: "general",
-  activeCustomiseTab: "tokens",
+  activeCustomiseTab: "plugins",
   activeWorkbenchTab: "diff",
   selectedSessionId: null,
 

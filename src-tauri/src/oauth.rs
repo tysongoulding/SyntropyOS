@@ -150,6 +150,7 @@ impl OAuthLoopback {
 
 pub const DEFAULT_GOOGLE_CLIENT_ID: &str = "1057421839841-syntropyos-desktop-local.apps.googleusercontent.com";
 pub const DEFAULT_OPENAI_CLIENT_ID: &str = "syntropyos-desktop-pkce";
+pub const DEFAULT_ATLASSIAN_CLIENT_ID: &str = "syntropyos-desktop-atlassian";
 
 pub fn build_auth_url(
     provider: &str,
@@ -167,12 +168,28 @@ pub fn build_auth_url(
                 client_id, redirect_uri, scope, session.state, session.code_challenge
             ))
         }
+        "google-workspace" => {
+            let client_id = custom_client_id.unwrap_or(DEFAULT_GOOGLE_CLIENT_ID);
+            let scope = "openid%20email%20https://www.googleapis.com/auth/gmail.modify%20https://www.googleapis.com/auth/drive%20https://www.googleapis.com/auth/calendar%20https://www.googleapis.com/auth/documents%20https://www.googleapis.com/auth/spreadsheets%20https://www.googleapis.com/auth/presentations";
+            Ok(format!(
+                "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=plain&access_type=offline&prompt=consent",
+                client_id, redirect_uri, scope, session.state, session.code_challenge
+            ))
+        }
         "openai" => {
             let client_id = custom_client_id.unwrap_or(DEFAULT_OPENAI_CLIENT_ID);
             let scope = "model.read%20model.request";
             Ok(format!(
                 "https://auth.openai.com/authorize?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=plain",
                 client_id, redirect_uri, scope, session.state, session.code_challenge
+            ))
+        }
+        "atlassian" => {
+            let client_id = custom_client_id.unwrap_or(DEFAULT_ATLASSIAN_CLIENT_ID);
+            let scope = "read:jira-work%20write:jira-work%20read:confluence-content.all%20write:confluence-content%20offline_access";
+            Ok(format!(
+                "https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id={}&scope={}&redirect_uri={}&state={}&response_type=code&prompt=consent",
+                client_id, scope, redirect_uri, session.state
             ))
         }
         _ => Err(OAuthError::AuthFailed(format!("OAuth not supported for {}", provider))),
@@ -194,7 +211,7 @@ pub async fn exchange_code_for_token(
     let redirect_uri = format!("http://127.0.0.1:{}/oauth/callback", port);
 
     match provider {
-        "google" => {
+        "google" | "google-workspace" => {
             let client_id = custom_client_id.unwrap_or(DEFAULT_GOOGLE_CLIENT_ID);
             let params = [
                 ("client_id", client_id),
@@ -248,6 +265,34 @@ pub async fn exchange_code_for_token(
             } else {
                 let body = resp.text().await.unwrap_or_default();
                 Err(OAuthError::AuthFailed(format!("OpenAI token exchange failed: {}", body)))
+            }
+        }
+        "atlassian" => {
+            let client_id = custom_client_id.unwrap_or(DEFAULT_ATLASSIAN_CLIENT_ID);
+            let params = [
+                ("grant_type", "authorization_code"),
+                ("client_id", client_id),
+                ("code", code),
+                ("redirect_uri", &redirect_uri),
+                ("code_verifier", &session.code_verifier),
+            ];
+
+            let resp = client
+                .post("https://auth.atlassian.com/oauth/token")
+                .form(&params)
+                .send()
+                .await
+                .map_err(|e| OAuthError::AuthFailed(e.to_string()))?;
+
+            if resp.status().is_success() {
+                let data: serde_json::Value = resp.json().await.map_err(|e| OAuthError::AuthFailed(e.to_string()))?;
+                let token = data["access_token"]
+                    .as_str()
+                    .ok_or_else(|| OAuthError::AuthFailed("No access_token in response".into()))?;
+                Ok(token.to_string())
+            } else {
+                let body = resp.text().await.unwrap_or_default();
+                Err(OAuthError::AuthFailed(format!("Atlassian token exchange failed: {}", body)))
             }
         }
         _ => Err(OAuthError::AuthFailed(format!("OAuth exchange not supported for {}", provider))),

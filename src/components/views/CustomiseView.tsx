@@ -16,12 +16,12 @@ export function CustomiseView() {
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
   }[] = [
-    { id: "tokens", label: "Token Usage", icon: Coins, badge: "Startup" },
+    { id: "plugins", label: "Plugins", icon: ToyBrick, badge: "Integrations" },
     { id: "rules", label: "Rules", icon: Shield },
     { id: "personas", label: "Chat Personas", icon: Bot },
     { id: "skills", label: "Skills", icon: Zap },
     { id: "mcps", label: "MCPs", icon: PlugZap },
-    { id: "plugins", label: "Plugins", icon: ToyBrick },
+    { id: "tokens", label: "Token Usage", icon: Coins, badge: "Startup" },
   ];
 
   return (
