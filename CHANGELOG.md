@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.2...v0.1.3) (2026-09-05)
+
+
+### Features
+
+* add Android and iOS release build runners to GitHub Actions ([#4](https://github.com/tysongoulding/SyntropyOS/issues/4)) ([e83de75](https://github.com/tysongoulding/SyntropyOS/commit/e83de75315ecea298d05086126a2acb67bb986f4))
+
 ## [0.1.2](https://github.com/tysongoulding/SyntropyOS/compare/v0.1.1...v0.1.2) (2026-09-04)
 
 
