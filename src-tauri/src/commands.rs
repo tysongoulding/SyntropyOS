@@ -3,7 +3,9 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State, Window};
 
 use crate::paths::AppPaths;
-use crate::protocol::{PromptConfigDto, SystemStatus, WorkstreamCommand, WorkstreamEvent};
+use crate::protocol::{
+    PromptConfigDto, RpcEvent, SystemStatus, TestKeyResponse, WorkstreamCommand, WorkstreamEvent,
+};
 use crate::keystore::SecureKeystore;
 use syntropy_core::blackboard::{BlackboardArtifact, BlackboardStore};
 use syntropy_core::blueprints::sprint::OneHourSprintBlueprint;
@@ -71,7 +73,259 @@ pub async fn sync_provider_keys(
 }
 
 #[tauri::command]
-pub async fn save_lota_settings(_settings: serde_json::Value) -> Result<(), String> {
+pub async fn get_saved_auth_keys(
+    state: State<'_, AppState>,
+) -> Result<HashMap<String, String>, String> {
+    let mut map = HashMap::new();
+    let providers = ["gemini", "anthropic", "openai", "deepseek", "groq"];
+    for p in providers {
+        if let Ok(Some(secret)) = state.keystore.get_secret(p).await {
+            map.insert(p.to_string(), secret.to_string());
+        }
+    }
+    Ok(map)
+}
+
+#[tauri::command]
+pub async fn test_provider_key(
+    provider: String,
+    key: String,
+) -> Result<TestKeyResponse, String> {
+    let clean_key = key.trim();
+    if clean_key.is_empty() {
+        return Ok(TestKeyResponse {
+            success: false,
+            latency_ms: 0,
+            message: "API Key cannot be blank".to_string(),
+        });
+    }
+
+    let start = std::time::Instant::now();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    match provider.as_str() {
+        "gemini" => {
+            let url = format!(
+                "https://generativelanguage.googleapis.com/v1beta/models?key={}",
+                clean_key
+            );
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    let status = resp.status();
+                    if status.is_success() {
+                        Ok(TestKeyResponse {
+                            success: true,
+                            latency_ms: latency,
+                            message: format!("Google Gemini Verified ({})", status.as_u16()),
+                        })
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        let error_msg = serde_json::from_str::<serde_json::Value>(&body)
+                            .ok()
+                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        Ok(TestKeyResponse {
+                            success: false,
+                            latency_ms: latency,
+                            message: error_msg,
+                        })
+                    }
+                }
+                Err(err) => Ok(TestKeyResponse {
+                    success: false,
+                    latency_ms: start.elapsed().as_millis() as u64,
+                    message: err.to_string(),
+                }),
+            }
+        }
+        "anthropic" => {
+            let url = "https://api.anthropic.com/v1/models";
+            match client
+                .get(url)
+                .header("x-api-key", clean_key)
+                .header("anthropic-version", "2023-06-01")
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    let status = resp.status();
+                    if status.is_success() {
+                        Ok(TestKeyResponse {
+                            success: true,
+                            latency_ms: latency,
+                            message: format!("Anthropic Verified ({})", status.as_u16()),
+                        })
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        let error_msg = serde_json::from_str::<serde_json::Value>(&body)
+                            .ok()
+                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        Ok(TestKeyResponse {
+                            success: false,
+                            latency_ms: latency,
+                            message: error_msg,
+                        })
+                    }
+                }
+                Err(err) => Ok(TestKeyResponse {
+                    success: false,
+                    latency_ms: start.elapsed().as_millis() as u64,
+                    message: err.to_string(),
+                }),
+            }
+        }
+        "openai" => {
+            let url = "https://api.openai.com/v1/models";
+            match client
+                .get(url)
+                .header("Authorization", format!("Bearer {}", clean_key))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    let status = resp.status();
+                    if status.is_success() {
+                        Ok(TestKeyResponse {
+                            success: true,
+                            latency_ms: latency,
+                            message: format!("OpenAI Verified ({})", status.as_u16()),
+                        })
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        let error_msg = serde_json::from_str::<serde_json::Value>(&body)
+                            .ok()
+                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        Ok(TestKeyResponse {
+                            success: false,
+                            latency_ms: latency,
+                            message: error_msg,
+                        })
+                    }
+                }
+                Err(err) => Ok(TestKeyResponse {
+                    success: false,
+                    latency_ms: start.elapsed().as_millis() as u64,
+                    message: err.to_string(),
+                }),
+            }
+        }
+        "groq" => {
+            let url = "https://api.groq.com/openai/v1/models";
+            match client
+                .get(url)
+                .header("Authorization", format!("Bearer {}", clean_key))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    let status = resp.status();
+                    if status.is_success() {
+                        Ok(TestKeyResponse {
+                            success: true,
+                            latency_ms: latency,
+                            message: format!("Groq Verified ({})", status.as_u16()),
+                        })
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        let error_msg = serde_json::from_str::<serde_json::Value>(&body)
+                            .ok()
+                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        Ok(TestKeyResponse {
+                            success: false,
+                            latency_ms: latency,
+                            message: error_msg,
+                        })
+                    }
+                }
+                Err(err) => Ok(TestKeyResponse {
+                    success: false,
+                    latency_ms: start.elapsed().as_millis() as u64,
+                    message: err.to_string(),
+                }),
+            }
+        }
+        "deepseek" => {
+            let url = "https://api.deepseek.com/models";
+            match client
+                .get(url)
+                .header("Authorization", format!("Bearer {}", clean_key))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    let status = resp.status();
+                    if status.is_success() {
+                        Ok(TestKeyResponse {
+                            success: true,
+                            latency_ms: latency,
+                            message: format!("DeepSeek Verified ({})", status.as_u16()),
+                        })
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        let error_msg = serde_json::from_str::<serde_json::Value>(&body)
+                            .ok()
+                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        Ok(TestKeyResponse {
+                            success: false,
+                            latency_ms: latency,
+                            message: error_msg,
+                        })
+                    }
+                }
+                Err(err) => Ok(TestKeyResponse {
+                    success: false,
+                    latency_ms: start.elapsed().as_millis() as u64,
+                    message: err.to_string(),
+                }),
+            }
+        }
+        _ => Ok(TestKeyResponse {
+            success: true,
+            latency_ms: 5,
+            message: "Format accepted".to_string(),
+        }),
+    }
+}
+
+#[tauri::command]
+pub async fn load_lota_settings(
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let path = state.paths.app_data_dir.join("settings.json");
+    if path.exists() {
+        let content = tokio::fs::read_to_string(&path)
+            .await
+            .map_err(|e| e.to_string())?;
+        let val: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| e.to_string())?;
+        Ok(val)
+    } else {
+        Ok(serde_json::json!({}))
+    }
+}
+
+#[tauri::command]
+pub async fn save_lota_settings(
+    state: State<'_, AppState>,
+    settings: serde_json::Value,
+) -> Result<(), String> {
+    let path = state.paths.app_data_dir.join("settings.json");
+    let content = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -88,18 +342,83 @@ pub async fn send_rpc_command(
         let message = request.get("message").and_then(|v| v.as_str()).unwrap_or("");
         let ws_id = format!("ws-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
 
-        // Stream typewriter events
-        let stream_text = format!("SyntropyOS Autonomous Federation processing: \"{}\". Synthesizing Blackboard artifacts.", message);
-        for chunk in stream_text.split_whitespace() {
+        // 1. Emit turn_start
+        let _ = app.emit(
+            "rho://event",
+            RpcEvent::TurnStart {
+                turn_number: 1,
+                prompt: message.to_string(),
+            },
+        );
+
+        // 2. Retrieve Gemini API key from hardware Keystore
+        let gemini_key = state.keystore.get_secret("gemini").await.ok().flatten();
+
+        let full_response = if let Some(key) = gemini_key {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(60))
+                .build()
+                .unwrap_or_default();
+
+            let url = format!(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+                key.as_str()
+            );
+
+            let body = serde_json::json!({
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{ "text": message }]
+                    }
+                ]
+            });
+
+            match client.post(&url).json(&body).send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let data: serde_json::Value = resp.json().await.unwrap_or_default();
+                        data["candidates"][0]["content"]["parts"][0]["text"]
+                            .as_str()
+                            .unwrap_or("No response content generated from Gemini.")
+                            .to_string()
+                    } else {
+                        let err_body = resp.text().await.unwrap_or_default();
+                        let msg = serde_json::from_str::<serde_json::Value>(&err_body)
+                            .ok()
+                            .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        format!("⚠️ Google Gemini API Error: {}", msg)
+                    }
+                }
+                Err(e) => format!("⚠️ Google Gemini Connection Error: {}", e),
+            }
+        } else {
+            format!(
+                "⚠️ No Google Gemini API key configured in Keystore.\n\nPlease open Settings -> Cloud Providers & API Keys and save your Gemini API key to activate live inference.\n\n(Local echo: \"{}\")",
+                message
+            )
+        };
+
+        // 3. Stream text chunks
+        for chunk in full_response.split_inclusive(' ') {
             let _ = app.emit(
                 "rho://event",
-                serde_json::json!({
-                    "type": "event",
-                    "event": "token_stream",
-                    "chunk": format!("{} ", chunk)
-                }),
+                RpcEvent::TextChunk {
+                    content: chunk.to_string(),
+                },
             );
+            tokio::time::sleep(tokio::time::Duration::from_millis(15)).await;
         }
+
+        // 4. Emit turn_end
+        let _ = app.emit(
+            "rho://event",
+            RpcEvent::TurnEnd {
+                turn_number: 1,
+            },
+        );
 
         // Increment FTA hours
         {

@@ -104,3 +104,37 @@ pub struct SystemStatus {
     pub active_workstreams_count: usize,
     pub total_labor_hours_saved: f64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestKeyResponse {
+    pub success: bool,
+    pub latency_ms: u64,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RpcEvent {
+    SessionStart {
+        session_id: String,
+        model: String,
+        provider: String,
+    },
+    TurnStart {
+        turn_number: usize,
+        prompt: String,
+    },
+    TextChunk {
+        content: String,
+    },
+    ReasoningChunk {
+        content: String,
+    },
+    TurnEnd {
+        turn_number: usize,
+    },
+    Error {
+        code: String,
+        message: String,
+    },
+}

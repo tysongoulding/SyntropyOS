@@ -57,3 +57,28 @@ fn test_window_config() {
     assert_eq!(win.theme, Some(tauri::Theme::Dark));
     assert_eq!(win.background_color, Some(tauri::window::Color(13, 17, 23, 255)));
 }
+
+#[test]
+fn test_test_key_response_contract() {
+    use syntropy_os_lib::protocol::TestKeyResponse;
+    let res = TestKeyResponse {
+        success: true,
+        latency_ms: 120,
+        message: "Google Gemini Verified (200)".to_string(),
+    };
+    let json = serde_json::to_string(&res).unwrap();
+    assert!(json.contains("success"));
+    assert!(json.contains("latency_ms"));
+    assert!(json.contains("message"));
+}
+
+#[test]
+fn test_rpc_event_contract() {
+    use syntropy_os_lib::protocol::RpcEvent;
+    let ev = RpcEvent::TextChunk {
+        content: "Hello Gemini".to_string(),
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    assert!(json.contains("\"type\":\"text_chunk\""));
+    assert!(json.contains("\"content\":\"Hello Gemini\""));
+}

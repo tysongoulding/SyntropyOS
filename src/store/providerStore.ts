@@ -44,16 +44,14 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
     id: "gemini",
     name: "Google Gemini",
     type: "api_key",
-    defaultModel: "gemini-flash-latest",
+    defaultModel: "gemini-2.5-flash",
     models: [
-      "gemini-flash-latest",
-      "gemini-pro-latest",
-      "gemini-3.5-flash",
-      "gemini-3.7-flash",
-      "gemini-3.8-flash",
-      "gemini-3.1-flash-lite",
-      "gemini-flash-lite-latest",
-      "gemma-4-31b-it",
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-2.0-flash",
+      "gemini-2.0-flash-lite",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
     ],
     isConfigured: false,
   },
@@ -140,7 +138,7 @@ const loadInitialActive = (): { provider: string; model: string } => {
       return JSON.parse(raw);
     }
   } catch {}
-  return { provider: "gemini", model: "gemini-flash-latest" };
+  return { provider: "gemini", model: "gemini-2.5-flash" };
 };
 
 export type ThinkingLevel = "high" | "med" | "low" | "off";
@@ -273,7 +271,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
       return { success: false, message: "API Key cannot be blank" };
     }
 
-    // Call real Tauri network validation command
+    // Call real Tauri network validation command (runs natively without CORS restrictions)
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
@@ -283,8 +281,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
         );
         return { success: res.success, message: res.message, latency: res.latency_ms };
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, message: msg };
+        console.warn("Tauri test_provider_key command error, attempting web probe fallback:", err);
       }
     }
 
