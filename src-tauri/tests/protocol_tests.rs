@@ -65,12 +65,16 @@ fn test_test_key_response_contract() {
         success: true,
         latency_ms: 120,
         message: "Google Gemini Verified (200)".to_string(),
+        models: vec!["gemini-2.5-flash".to_string(), "gemini-2.0-flash".to_string()],
     };
     let json = serde_json::to_string(&res).unwrap();
     assert!(json.contains("success"));
     assert!(json.contains("latency_ms"));
     assert!(json.contains("message"));
+    assert!(json.contains("models"));
+    assert!(json.contains("gemini-2.5-flash"));
 }
+
 
 #[test]
 fn test_rpc_event_contract() {

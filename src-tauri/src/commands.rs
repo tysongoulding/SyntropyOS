@@ -97,6 +97,7 @@ pub async fn test_provider_key(
             success: false,
             latency_ms: 0,
             message: "API Key cannot be blank".to_string(),
+            models: Vec::new(),
         });
     }
 
@@ -117,10 +118,43 @@ pub async fn test_provider_key(
                     let latency = start.elapsed().as_millis() as u64;
                     let status = resp.status();
                     if status.is_success() {
+                        let body = resp.text().await.unwrap_or_default();
+                        let mut models = Vec::new();
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(arr) = val.get("models").and_then(|m| m.as_array()) {
+                                for item in arr {
+                                    let supports_gen = item
+                                        .get("supportedGenerationMethods")
+                                        .and_then(|v| v.as_array())
+                                        .map(|methods| {
+                                            methods.iter().any(|m| m.as_str() == Some("generateContent"))
+                                        })
+                                        .unwrap_or(true);
+                                    if supports_gen {
+                                        if let Some(name) = item.get("name").and_then(|n| n.as_str()) {
+                                            let clean_name = name.strip_prefix("models/").unwrap_or(name);
+                                            models.push(clean_name.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if models.is_empty() {
+                            models = vec![
+                                "gemini-2.5-flash".to_string(),
+                                "gemini-2.5-pro".to_string(),
+                                "gemini-2.0-flash".to_string(),
+                                "gemini-2.0-flash-lite".to_string(),
+                                "gemini-2.0-flash-thinking-exp-01-21".to_string(),
+                                "gemini-1.5-flash".to_string(),
+                                "gemini-1.5-pro".to_string(),
+                            ];
+                        }
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("Google Gemini Verified ({})", status.as_u16()),
+                            message: format!("Google Gemini Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            models,
                         })
                     } else {
                         let body = resp.text().await.unwrap_or_default();
@@ -132,6 +166,7 @@ pub async fn test_provider_key(
                             success: false,
                             latency_ms: latency,
                             message: error_msg,
+                            models: Vec::new(),
                         })
                     }
                 }
@@ -139,6 +174,7 @@ pub async fn test_provider_key(
                     success: false,
                     latency_ms: start.elapsed().as_millis() as u64,
                     message: err.to_string(),
+                    models: Vec::new(),
                 }),
             }
         }
@@ -155,10 +191,31 @@ pub async fn test_provider_key(
                     let latency = start.elapsed().as_millis() as u64;
                     let status = resp.status();
                     if status.is_success() {
+                        let body = resp.text().await.unwrap_or_default();
+                        let mut models = Vec::new();
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
+                                for item in arr {
+                                    if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
+                                        if id.starts_with("claude-") {
+                                            models.push(id.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if models.is_empty() {
+                            models = vec![
+                                "claude-3-7-sonnet-20250219".to_string(),
+                                "claude-3-5-sonnet-20241022".to_string(),
+                                "claude-3-5-haiku-20241022".to_string(),
+                            ];
+                        }
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("Anthropic Verified ({})", status.as_u16()),
+                            message: format!("Anthropic Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            models,
                         })
                     } else {
                         let body = resp.text().await.unwrap_or_default();
@@ -170,6 +227,7 @@ pub async fn test_provider_key(
                             success: false,
                             latency_ms: latency,
                             message: error_msg,
+                            models: Vec::new(),
                         })
                     }
                 }
@@ -177,6 +235,7 @@ pub async fn test_provider_key(
                     success: false,
                     latency_ms: start.elapsed().as_millis() as u64,
                     message: err.to_string(),
+                    models: Vec::new(),
                 }),
             }
         }
@@ -192,10 +251,39 @@ pub async fn test_provider_key(
                     let latency = start.elapsed().as_millis() as u64;
                     let status = resp.status();
                     if status.is_success() {
+                        let body = resp.text().await.unwrap_or_default();
+                        let mut models = Vec::new();
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
+                                for item in arr {
+                                    if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
+                                        if (id.starts_with("gpt-") || id.starts_with("o1") || id.starts_with("o3") || id.starts_with("chatgpt-"))
+                                            && !id.contains("audio")
+                                            && !id.contains("realtime")
+                                            && !id.contains("embedding")
+                                            && !id.contains("tts")
+                                            && !id.contains("whisper")
+                                        {
+                                            models.push(id.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        models.sort();
+                        if models.is_empty() {
+                            models = vec![
+                                "gpt-4o".to_string(),
+                                "gpt-4o-mini".to_string(),
+                                "o1".to_string(),
+                                "o3-mini".to_string(),
+                            ];
+                        }
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("OpenAI Verified ({})", status.as_u16()),
+                            message: format!("OpenAI Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            models,
                         })
                     } else {
                         let body = resp.text().await.unwrap_or_default();
@@ -207,6 +295,7 @@ pub async fn test_provider_key(
                             success: false,
                             latency_ms: latency,
                             message: error_msg,
+                            models: Vec::new(),
                         })
                     }
                 }
@@ -214,6 +303,7 @@ pub async fn test_provider_key(
                     success: false,
                     latency_ms: start.elapsed().as_millis() as u64,
                     message: err.to_string(),
+                    models: Vec::new(),
                 }),
             }
         }
@@ -229,10 +319,30 @@ pub async fn test_provider_key(
                     let latency = start.elapsed().as_millis() as u64;
                     let status = resp.status();
                     if status.is_success() {
+                        let body = resp.text().await.unwrap_or_default();
+                        let mut models = Vec::new();
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
+                                for item in arr {
+                                    if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
+                                        if !id.contains("whisper") {
+                                            models.push(id.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if models.is_empty() {
+                            models = vec![
+                                "llama-3.3-70b-versatile".to_string(),
+                                "mixtral-8x7b-32768".to_string(),
+                            ];
+                        }
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("Groq Verified ({})", status.as_u16()),
+                            message: format!("Groq Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            models,
                         })
                     } else {
                         let body = resp.text().await.unwrap_or_default();
@@ -244,6 +354,7 @@ pub async fn test_provider_key(
                             success: false,
                             latency_ms: latency,
                             message: error_msg,
+                            models: Vec::new(),
                         })
                     }
                 }
@@ -251,6 +362,7 @@ pub async fn test_provider_key(
                     success: false,
                     latency_ms: start.elapsed().as_millis() as u64,
                     message: err.to_string(),
+                    models: Vec::new(),
                 }),
             }
         }
@@ -266,10 +378,28 @@ pub async fn test_provider_key(
                     let latency = start.elapsed().as_millis() as u64;
                     let status = resp.status();
                     if status.is_success() {
+                        let body = resp.text().await.unwrap_or_default();
+                        let mut models = Vec::new();
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
+                                for item in arr {
+                                    if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
+                                        models.push(id.to_string());
+                                    }
+                                }
+                            }
+                        }
+                        if models.is_empty() {
+                            models = vec![
+                                "deepseek-chat".to_string(),
+                                "deepseek-reasoner".to_string(),
+                            ];
+                        }
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("DeepSeek Verified ({})", status.as_u16()),
+                            message: format!("DeepSeek Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            models,
                         })
                     } else {
                         let body = resp.text().await.unwrap_or_default();
@@ -281,6 +411,7 @@ pub async fn test_provider_key(
                             success: false,
                             latency_ms: latency,
                             message: error_msg,
+                            models: Vec::new(),
                         })
                     }
                 }
@@ -288,6 +419,7 @@ pub async fn test_provider_key(
                     success: false,
                     latency_ms: start.elapsed().as_millis() as u64,
                     message: err.to_string(),
+                    models: Vec::new(),
                 }),
             }
         }
@@ -295,9 +427,30 @@ pub async fn test_provider_key(
             success: true,
             latency_ms: 5,
             message: "Format accepted".to_string(),
+            models: Vec::new(),
         }),
     }
 }
+
+#[tauri::command]
+pub async fn fetch_provider_models(
+    state: State<'_, AppState>,
+    provider: String,
+) -> Result<TestKeyResponse, String> {
+    let key = match state.keystore.get_secret(&provider).await {
+        Ok(Some(secret)) => secret.to_string(),
+        _ => {
+            return Ok(TestKeyResponse {
+                success: false,
+                latency_ms: 0,
+                message: format!("No API key found in vault for provider {}", provider),
+                models: Vec::new(),
+            });
+        }
+    };
+    test_provider_key(provider, key).await
+}
+
 
 #[tauri::command]
 pub async fn load_lota_settings(
@@ -340,6 +493,11 @@ pub async fn send_rpc_command(
 
     if cmd_type == "prompt" {
         let message = request.get("message").and_then(|v| v.as_str()).unwrap_or("");
+        let requested_model = request
+            .get("model")
+            .and_then(|v| v.as_str())
+            .filter(|m| !m.is_empty())
+            .unwrap_or("gemini-2.5-flash");
         let ws_id = format!("ws-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
 
         // 1. Emit turn_start
@@ -361,7 +519,8 @@ pub async fn send_rpc_command(
                 .unwrap_or_default();
 
             let url = format!(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+                "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                requested_model,
                 key.as_str()
             );
 

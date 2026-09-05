@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { rhoClient } from "../lib/rpc";
 import { useSessionStore } from "../store/sessionStore";
+import { useProviderStore } from "../store/providerStore";
 import { RpcCommand, RpcResponse } from "../lib/protocol";
 
 export function useRhoEngine() {
@@ -16,7 +17,8 @@ export function useRhoEngine() {
   }, []);
 
   const prompt = useCallback((message: string) => {
-    return rhoClient.prompt(message);
+    const { activeModel, activeProviderId } = useProviderStore.getState();
+    return rhoClient.prompt(message, activeModel, activeProviderId);
   }, []);
 
   const steer = useCallback((message: string) => {

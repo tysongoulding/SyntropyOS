@@ -14,20 +14,6 @@ export interface ProviderItem {
 
 const PROVIDERS: ProviderItem[] = [
   {
-    id: "anthropic",
-    name: "Anthropic",
-    defaultModel: "claude-3-7-sonnet-20250219",
-    models: ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
-    type: "api_key",
-  },
-  {
-    id: "openai",
-    name: "OpenAI",
-    defaultModel: "gpt-4o",
-    models: ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"],
-    type: "api_key",
-  },
-  {
     id: "gemini",
     name: "Google Gemini",
     defaultModel: "gemini-2.5-flash",
@@ -36,9 +22,36 @@ const PROVIDERS: ProviderItem[] = [
       "gemini-2.5-pro",
       "gemini-2.0-flash",
       "gemini-2.0-flash-lite",
+      "gemini-2.0-flash-thinking-exp-01-21",
+      "gemini-2.0-flash-thinking-exp",
+      "gemini-2.0-pro-exp-02-05",
       "gemini-1.5-flash",
+      "gemini-1.5-flash-8b",
       "gemini-1.5-pro",
+      "gemini-exp-1206",
+      "gemma-2-27b-it",
+      "gemma-2-9b-it",
+      "gemma-2-2b-it",
     ],
+    type: "api_key",
+  },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    defaultModel: "claude-3-7-sonnet-20250219",
+    models: [
+      "claude-3-7-sonnet-20250219",
+      "claude-3-5-sonnet-20241022",
+      "claude-3-5-haiku-20241022",
+      "claude-3-opus-20240229",
+    ],
+    type: "api_key",
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    defaultModel: "gpt-4o",
+    models: ["gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "o3-mini", "gpt-4-turbo"],
     type: "api_key",
   },
   {
@@ -52,7 +65,12 @@ const PROVIDERS: ProviderItem[] = [
     id: "groq",
     name: "Groq",
     defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
+    models: [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      "mixtral-8x7b-32768",
+      "deepseek-r1-distill-llama-70b",
+    ],
     type: "api_key",
   },
   {
@@ -103,6 +121,7 @@ export function ModelProviderPicker() {
         {PROVIDERS.map((prov) => {
           const isCurrentProvider = activeProviderId.toLowerCase() === prov.id.toLowerCase();
           const configured = providers[prov.id]?.isConfigured;
+          const availableModels = providers[prov.id]?.models?.length ? providers[prov.id].models : prov.models;
 
           return (
             <div
@@ -135,9 +154,12 @@ export function ModelProviderPicker() {
               </div>
 
               <div className="space-y-1.5">
-                <div className="text-[10px] text-[#8b949e] uppercase tracking-wider font-semibold">Select Model:</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {prov.models.map((mod) => {
+                <div className="text-[10px] text-[#8b949e] uppercase tracking-wider font-semibold flex items-center justify-between">
+                  <span>Select Model:</span>
+                  <span className="text-[10px] text-[#58a6ff] font-mono lowercase">{availableModels.length} models</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+                  {availableModels.map((mod) => {
                     const isCurrentModel = isCurrentProvider && activeModel === mod;
                     return (
                       <button
@@ -163,3 +185,4 @@ export function ModelProviderPicker() {
     </div>
   );
 }
+

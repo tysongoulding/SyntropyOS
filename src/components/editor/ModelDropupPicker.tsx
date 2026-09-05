@@ -17,19 +17,33 @@ export function formatModelDisplayName(
   thinking: ThinkingLevel = "high",
   providerId?: string
 ): string {
-  if (!model) return "Gemini 3.7 Flash High";
+  if (!model) return "Gemini 2.5 Flash";
   const clean = model.toLowerCase();
   let base = model;
-  if (clean.includes("gemini-flash") || clean.includes("gemini-3.7-flash")) base = "Gemini 3.7 Flash";
-  else if (clean.includes("gemini-pro") || clean.includes("gemini-1.5-pro")) base = "Gemini 1.5 Pro";
+  if (clean === "gemini-2.5-flash") base = "Gemini 2.5 Flash";
+  else if (clean === "gemini-2.5-pro") base = "Gemini 2.5 Pro";
+  else if (clean.includes("2.0-flash-thinking")) base = "Gemini 2.0 Flash Thinking";
+  else if (clean.includes("2.0-pro")) base = "Gemini 2.0 Pro";
+  else if (clean.includes("2.0-flash-lite")) base = "Gemini 2.0 Flash Lite";
+  else if (clean.includes("2.0-flash")) base = "Gemini 2.0 Flash";
+  else if (clean.includes("1.5-flash-8b")) base = "Gemini 1.5 Flash 8B";
+  else if (clean.includes("1.5-flash")) base = "Gemini 1.5 Flash";
+  else if (clean.includes("1.5-pro")) base = "Gemini 1.5 Pro";
+  else if (clean.startsWith("gemma-2")) base = model;
   else if (clean.includes("claude-3-7-sonnet")) base = "Claude 3.7 Sonnet";
   else if (clean.includes("claude-3-5-sonnet")) base = "Claude 3.5 Sonnet";
   else if (clean.includes("claude-3-5-haiku")) base = "Claude 3.5 Haiku";
+  else if (clean.includes("claude-3-opus")) base = "Claude 3 Opus";
   else if (clean.includes("gpt-4o-mini")) base = "GPT-4o Mini";
   else if (clean.includes("gpt-4o")) base = "GPT-4o";
+  else if (clean.includes("o1-mini")) base = "OpenAI o1 Mini";
   else if (clean.includes("o1")) base = "OpenAI o1";
-  else if (clean.includes("deepseek")) base = "DeepSeek Coder";
-  else if (clean.includes("llama")) base = "Llama 3.3 70B";
+  else if (clean.includes("o3-mini")) base = "OpenAI o3 Mini";
+  else if (clean.includes("deepseek-reasoner")) base = "DeepSeek Reasoner (R1)";
+  else if (clean.includes("deepseek-chat")) base = "DeepSeek Chat (V3)";
+  else if (clean.includes("llama-3.3-70b")) base = "Llama 3.3 70B";
+  else if (clean.includes("llama-3.1-8b")) base = "Llama 3.1 8B";
+  else if (clean.includes("mixtral")) base = "Mixtral 8x7B";
 
   const isThinkingSupported = supportsThinking(model, providerId);
   if (!isThinkingSupported || thinking === "off") return base;

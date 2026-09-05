@@ -15,6 +15,9 @@ import {
   Save,
   Star,
   Activity,
+  Cpu,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export function ProviderSettings() {
@@ -28,6 +31,7 @@ export function ProviderSettings() {
     activeModel,
     setActiveProviderAndModel,
     testProviderKeyLive,
+    fetchProviderModels,
   } = useProviderStore();
   const { addToast } = useToastStore();
   const { send } = useRhoEngine();
@@ -82,6 +86,24 @@ export function ProviderSettings() {
     }
   };
 
+  const handleSyncModels = async (provider: ProviderConfig) => {
+    setTestStatuses((prev) => ({ ...prev, [provider.id]: { status: "testing" } }));
+    try {
+      const models = await fetchProviderModels(provider.id);
+      setTestStatuses((prev) => ({
+        ...prev,
+        [provider.id]: { status: "success", message: `Discovered & synced ${models.length} models` },
+      }));
+      addToast(`Synced ${models.length} live models for ${provider.name}`, "success");
+    } catch (err) {
+      setTestStatuses((prev) => ({
+        ...prev,
+        [provider.id]: { status: "error", message: String(err) },
+      }));
+      addToast(`Failed to sync models for ${provider.name}`, "error");
+    }
+  };
+
   const apiKeyProviders = Object.values(providers).filter((p) => p.type === "api_key");
   const oauthProviders = Object.values(providers).filter((p) => p.type === "oauth");
   const localProvider = providers.ollama;
@@ -111,11 +133,13 @@ export function ProviderSettings() {
               onToggleShow={() => toggleShowKey(prov.id)}
               onKeySave={(k) => handleKeySave(prov.id, prov.name, k)}
               onTestKey={(k) => handleTestKey(prov, k)}
+              onSyncModels={() => handleSyncModels(prov)}
               onSetActive={() => handleSetActive(prov)}
             />
           ))}
         </div>
       </div>
+
 
       {/* Local LLMs (Ollama) */}
       {localProvider && (
@@ -232,6 +256,7 @@ interface ApiKeyCardProps {
   onToggleShow: () => void;
   onKeySave: (key: string) => void;
   onTestKey: (key: string) => void;
+  onSyncModels: () => void;
   onSetActive: () => void;
 }
 
@@ -243,9 +268,11 @@ function ApiKeyCard({
   onToggleShow,
   onKeySave,
   onTestKey,
+  onSyncModels,
   onSetActive,
 }: ApiKeyCardProps) {
   const [currentVal, setCurrentVal] = useState(provider.apiKey || "");
+  const [showModels, setShowModels] = useState(false);
 
   const handleSave = () => {
     onKeySave(currentVal);
@@ -355,6 +382,46 @@ function ApiKeyCard({
           )}
         </div>
       )}
+
+      {/* Model inventory preview toggle & dynamic sync */}
+      <div className="pt-1 border-t border-[#30363d]/60 flex items-center justify-between text-[10px]">
+        <button
+          type="button"
+          onClick={() => setShowModels(!showModels)}
+          className="text-[#8b949e] hover:text-[#c9d1d9] flex items-center space-x-1 transition"
+        >
+          <Cpu className="w-3 h-3 text-[#58a6ff]" />
+          <span>{provider.models.length} Models Available</span>
+          {showModels ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+        </button>
+
+        <button
+          type="button"
+          onClick={onSyncModels}
+          disabled={testState?.status === "testing"}
+          className="text-[#58a6ff] hover:text-white flex items-center space-x-1 transition"
+          title="Discover and sync latest models from provider API"
+        >
+          <RefreshCw className={`w-2.5 h-2.5 ${testState?.status === "testing" ? "animate-spin" : ""}`} />
+          <span>Sync Models</span>
+        </button>
+      </div>
+
+      {showModels && (
+        <div className="bg-[#0d1117] border border-[#30363d] rounded-lg p-2 max-h-36 overflow-y-auto space-y-1">
+          <div className="flex flex-wrap gap-1">
+            {provider.models.map((m) => (
+              <span
+                key={m}
+                className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-[#161b22] border border-[#30363d] text-[#c9d1d9]"
+              >
+                {m}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

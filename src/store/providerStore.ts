@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { TestKeyResponse } from "../types/protocol";
 
 export interface ProviderConfig {
   id: string;
@@ -50,8 +51,16 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
       "gemini-2.5-pro",
       "gemini-2.0-flash",
       "gemini-2.0-flash-lite",
+      "gemini-2.0-flash-thinking-exp-01-21",
+      "gemini-2.0-flash-thinking-exp",
+      "gemini-2.0-pro-exp-02-05",
       "gemini-1.5-flash",
+      "gemini-1.5-flash-8b",
       "gemini-1.5-pro",
+      "gemini-exp-1206",
+      "gemma-2-27b-it",
+      "gemma-2-9b-it",
+      "gemma-2-2b-it",
     ],
     isConfigured: false,
   },
@@ -60,7 +69,12 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
     name: "Anthropic",
     type: "api_key",
     defaultModel: "claude-3-7-sonnet-20250219",
-    models: ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+    models: [
+      "claude-3-7-sonnet-20250219",
+      "claude-3-5-sonnet-20241022",
+      "claude-3-5-haiku-20241022",
+      "claude-3-opus-20240229",
+    ],
     isConfigured: false,
   },
   openai: {
@@ -68,7 +82,7 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
     name: "OpenAI",
     type: "api_key",
     defaultModel: "gpt-4o",
-    models: ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"],
+    models: ["gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "o3-mini", "gpt-4-turbo"],
     isConfigured: false,
   },
   deepseek: {
@@ -84,7 +98,12 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
     name: "Groq",
     type: "api_key",
     defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
+    models: [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      "mixtral-8x7b-32768",
+      "deepseek-r1-distill-llama-70b",
+    ],
     isConfigured: false,
   },
   ollama: {
@@ -124,8 +143,21 @@ const loadInitialProviders = (): Record<string, ProviderConfig> => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      return { ...DEFAULT_PROVIDERS, ...parsed };
+      const parsed = JSON.parse(raw) as Record<string, Partial<ProviderConfig>>;
+      const result: Record<string, ProviderConfig> = { ...DEFAULT_PROVIDERS };
+      for (const [key, defaultProv] of Object.entries(DEFAULT_PROVIDERS)) {
+        if (parsed[key]) {
+          const userModels = Array.isArray(parsed[key].models) ? parsed[key].models! : [];
+          // Preserve discovered models + guarantee default models are included
+          const mergedModels = Array.from(new Set([...defaultProv.models, ...userModels]));
+          result[key] = {
+            ...defaultProv,
+            ...parsed[key],
+            models: mergedModels,
+          };
+        }
+      }
+      return result;
     }
   } catch {}
   return DEFAULT_PROVIDERS;
@@ -158,12 +190,14 @@ export interface ProviderState {
   setThinkingLevel: (level: ThinkingLevel) => void;
   syncKeysToBackend: () => Promise<void>;
   loadKeysFromSharedAuthFile: () => Promise<void>;
-  testProviderKeyLive: (providerId: string, key: string) => Promise<{ success: boolean; message: string; latency?: number }>;
+  testProviderKeyLive: (providerId: string, key: string) => Promise<{ success: boolean; message: string; latency?: number; models?: string[] }>;
+  fetchProviderModels: (providerId: string) => Promise<string[]>;
   checkOllama: () => Promise<void>;
   savePreamble: (preset: PreamblePreset) => void;
   deletePreamble: (id: string) => void;
   setActivePreambleId: (id: string) => void;
 }
+
 
 const initialActive = loadInitialActive();
 
@@ -275,11 +309,29 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const res = await invoke<{ success: boolean; latency_ms: number; message: string }>(
+        const res = await invoke<TestKeyResponse>(
           "test_provider_key",
           { provider: providerId, key: cleanKey }
         );
-        return { success: res.success, message: res.message, latency: res.latency_ms };
+        if (res.success && res.models && res.models.length > 0) {
+          set((state) => {
+            const current = state.providers[providerId];
+            if (!current) return state;
+            const mergedModels = Array.from(new Set([...current.models, ...res.models!]));
+            const updated = {
+              ...state.providers,
+              [providerId]: {
+                ...current,
+                models: mergedModels,
+              },
+            };
+            try {
+              localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+            } catch {}
+            return { providers: updated };
+          });
+        }
+        return { success: res.success, message: res.message, latency: res.latency_ms, models: res.models };
       } catch (err: unknown) {
         console.warn("Tauri test_provider_key command error, attempting web probe fallback:", err);
       }
@@ -292,7 +344,42 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`);
         const latency = Math.round(performance.now() - start);
         if (res.ok) {
-          return { success: true, message: `Google Gemini Verified (${res.status})`, latency };
+          const data = await res.json().catch(() => ({}));
+          const discoveredModels: string[] = [];
+          if (Array.isArray(data.models)) {
+            for (const m of data.models) {
+              const supportsGen = Array.isArray(m.supportedGenerationMethods)
+                ? m.supportedGenerationMethods.includes("generateContent")
+                : true;
+              if (supportsGen && typeof m.name === "string") {
+                discoveredModels.push(m.name.replace(/^models\//, ""));
+              }
+            }
+          }
+          if (discoveredModels.length > 0) {
+            set((state) => {
+              const current = state.providers[providerId];
+              if (!current) return state;
+              const mergedModels = Array.from(new Set([...current.models, ...discoveredModels]));
+              const updated = {
+                ...state.providers,
+                [providerId]: {
+                  ...current,
+                  models: mergedModels,
+                },
+              };
+              try {
+                localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+              } catch {}
+              return { providers: updated };
+            });
+          }
+          return {
+            success: true,
+            message: `Google Gemini Verified (${res.status}, ${discoveredModels.length} models discovered)`,
+            latency,
+            models: discoveredModels,
+          };
         } else {
           const errData = await res.json().catch(() => ({}));
           const msg = errData.error?.message || `HTTP ${res.status}`;
@@ -305,6 +392,46 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
 
     return { success: true, message: "Format valid (Browser mode)", latency: 25 };
   },
+
+  fetchProviderModels: async (providerId: string) => {
+    const prov = get().providers[providerId];
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const res = await invoke<TestKeyResponse>("fetch_provider_models", { provider: providerId });
+        if (res.success && res.models && res.models.length > 0) {
+          set((state) => {
+            const current = state.providers[providerId];
+            if (!current) return state;
+            const mergedModels = Array.from(new Set([...current.models, ...res.models!]));
+            const updated = {
+              ...state.providers,
+              [providerId]: {
+                ...current,
+                models: mergedModels,
+              },
+            };
+            try {
+              localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+            } catch {}
+            return { providers: updated };
+          });
+          return res.models;
+        }
+      } catch (err) {
+        console.warn("fetch_provider_models failed, falling back to key test:", err);
+      }
+    }
+    const key = prov?.apiKey || "";
+    if (key.trim()) {
+      const res = await get().testProviderKeyLive(providerId, key);
+      if (res.models && res.models.length > 0) {
+        return res.models;
+      }
+    }
+    return prov?.models || [];
+  },
+
 
   setEndpoint: (id, endpoint) =>
     set((state) => {

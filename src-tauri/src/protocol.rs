@@ -110,7 +110,10 @@ pub struct TestKeyResponse {
     pub success: bool,
     pub latency_ms: u64,
     pub message: String,
+    #[serde(default)]
+    pub models: Vec<String>,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

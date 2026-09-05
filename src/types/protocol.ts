@@ -158,3 +158,11 @@ export interface SystemStatus {
   active_workstreams_count: number;
   total_labor_hours_saved: number;
 }
+
+export interface TestKeyResponse {
+  success: boolean;
+  latency_ms: number;
+  message: string;
+  models?: string[];
+}
+
