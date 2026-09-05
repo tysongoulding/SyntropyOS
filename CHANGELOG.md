@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/tysongoulding/SyntropyOS/compare/v0.3.0...v0.4.0) (2026-09-05)
+
+
+### Features
+
+* **chat:** add interactive hoverable footnotes and numbered web sources list ([3b49de6](https://github.com/tysongoulding/SyntropyOS/commit/3b49de6a711c725a0b7022f82a5e3ac86302ae20))
+* **search:** add native internet web search with Google Grounding, DuckDuckGo, and UI controls ([afa52e5](https://github.com/tysongoulding/SyntropyOS/commit/afa52e5d926f77fa6b3d368b70a68977717f15fa))
+* **ui:** add smooth animated transitions for sidebar, workbench, and statusbar ([875b21e](https://github.com/tysongoulding/SyntropyOS/commit/875b21e7ade610716e441e7231a034ca0ad1fa0f))
+
+
+### Bug Fixes
+
+* **chat:** eliminate boilerplate greeting and disable mandatory diagram/formula preambles ([bd7e47e](https://github.com/tysongoulding/SyntropyOS/commit/bd7e47e68bf98fe2747ba73470689b8e33e9df58))
+
 ## [0.3.0](https://github.com/tysongoulding/SyntropyOS/compare/v0.2.0...v0.3.0) (2026-09-05)
 
 
