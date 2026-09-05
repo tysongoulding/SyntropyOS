@@ -31,7 +31,7 @@ import { Bot } from "lucide-react";
 
 export function App() {
   const { messages, isRunning, addUserMessage } = useSessionStore();
-  const { activeView, statusbarOpen } = useUiStore();
+  const { activeView } = useUiStore();
   const { subagents, activeChatAgentId } = useSubagentStore();
   const { syncKeysToBackend, loadKeysFromSharedAuthFile, loadCachedModelsFromBackend, fetchAllProviderModels } = useProviderStore();
   const { mode } = useThemeStore();
@@ -144,10 +144,10 @@ export function App() {
           {activeView === "settings" && <SettingsHubView />}
         </main>
 
-        {activeView === "chat" && messages.length > 0 && <StreamingWorkbench />}
+        {activeView === "chat" && <StreamingWorkbench />}
       </div>
 
-      {statusbarOpen && <Statusbar />}
+      <Statusbar />
       <CommandPalette />
       <ToastContainer />
       <NewChatModal />

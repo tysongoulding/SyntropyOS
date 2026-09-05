@@ -28,7 +28,7 @@ export function Statusbar() {
     setRemoteUrl,
     setRemoteProvider,
   } = useWorkspaceStore();
-  const { toggleCommandPalette } = useUiStore();
+  const { statusbarOpen, toggleCommandPalette } = useUiStore();
   const { addToast } = useToastStore();
 
   const [dirPopoverOpen, setDirPopoverOpen] = useState(false);
@@ -58,6 +58,13 @@ export function Statusbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!statusbarOpen) {
+      setDirPopoverOpen(false);
+      setRepoPopoverOpen(false);
+    }
+  }, [statusbarOpen]);
 
   const openLocalFolder = () => {
     invoke("open_local_path", { path: workspacePath }).catch(() => {});
@@ -103,7 +110,13 @@ export function Statusbar() {
   };
 
   return (
-    <footer className="h-6 border-t border-[#30363d] bg-[#0d1117] flex items-center justify-between px-3 text-[10px] text-[#8b949e] select-none font-mono relative z-30">
+    <footer
+      className={`border-[#30363d] bg-[#0d1117] flex items-center justify-between px-3 text-[10px] text-[#8b949e] select-none font-mono relative z-30 overflow-hidden flex-shrink-0 transition-[height,opacity,border-color] duration-250 ease-in-out ${
+        statusbarOpen
+          ? "h-6 opacity-100 border-t"
+          : "h-0 opacity-0 border-t-0 border-transparent pointer-events-none py-0"
+      }`}
+    >
       {/* Left Section */}
       <div className="flex items-center space-x-3 truncate">
         {/* Command Palette trigger */}

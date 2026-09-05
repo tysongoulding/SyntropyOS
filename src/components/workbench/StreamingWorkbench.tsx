@@ -17,9 +17,6 @@ export function StreamingWorkbench() {
   const { workbenchOpen, activeWorkbenchTab, setActiveWorkbenchTab, setWorkbenchOpen } = useUiStore();
   const { messages, usage, sessionInfo, compaction } = useSessionStore();
   const { selectedFile } = useWorkspaceStore();
-
-  if (!workbenchOpen) return null;
-
   // Find latest edit tool call
   const latestEditMsg = [...messages].reverse().find(
     (m) => m.role === "tool" && m.toolCall?.tool === "edit"
@@ -38,8 +35,15 @@ export function StreamingWorkbench() {
   ];
 
   return (
-    <aside className="w-96 md:w-[480px] border-l border-[#30363d] bg-[#0d1117] flex flex-col h-full text-xs select-none">
-      {/* Workbench Header */}
+    <aside
+      className={`h-full bg-[#0d1117] flex flex-col text-xs select-none flex-shrink-0 overflow-hidden transition-[width,opacity,border-color] duration-300 ease-in-out ${
+        workbenchOpen
+          ? "w-96 md:w-[480px] border-l border-[#30363d] opacity-100"
+          : "w-0 border-l-0 border-transparent opacity-0 pointer-events-none"
+      }`}
+    >
+      <div className="w-96 md:w-[480px] h-full flex flex-col min-w-[24rem] md:min-w-[30rem]">
+        {/* Workbench Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#30363d] bg-[#161b22]">
         <div className="flex items-center space-x-1.5">
           <Columns className="w-4 h-4 text-[#58a6ff]" />
@@ -186,6 +190,7 @@ export function StreamingWorkbench() {
             />
           </div>
         )}
+      </div>
       </div>
     </aside>
   );

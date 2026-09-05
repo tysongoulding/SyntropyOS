@@ -69,8 +69,6 @@ export function Sidebar() {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
-  if (!sidebarOpen) return null;
-
   // 1. Direct Dedicated Agent Conversation
   const handleChatWithAgent = (agent: SubagentDefinition) => {
     setActiveChatAgentId(agent.id);
@@ -136,8 +134,16 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col h-full text-xs select-none flex-shrink-0">
-      {/* Top Action Buttons */}
+    <>
+      <aside
+        className={`h-full bg-[#0d1117] flex flex-col text-xs select-none flex-shrink-0 overflow-hidden transition-[width,opacity,border-color] duration-300 ease-in-out ${
+          sidebarOpen
+            ? "w-64 border-r border-[#30363d] opacity-100"
+            : "w-0 border-r-0 border-transparent opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="w-64 h-full flex flex-col min-w-[16rem]">
+          {/* Top Action Buttons */}
       <div className="p-3 border-b border-[#30363d] space-y-2 flex-shrink-0">
         {/* New Agent Button */}
         <button
@@ -496,22 +502,24 @@ export function Sidebar() {
           <span className="font-medium">Settings</span>
         </button>
       </div>
-
-      {/* Standalone Agent Detail / Edit Modal */}
-      {editingSubagent && (
-        <SubagentDetailModal
-          subagent={editingSubagent}
-          onClose={() => setEditingSubagent(null)}
-        />
-      )}
-
-      {/* Rename Agent Modal */}
-      {renamingSubagent && (
-        <RenameSubagentModal
-          subagent={renamingSubagent}
-          onClose={() => setRenamingSubagent(null)}
-        />
-      )}
+      </div>
     </aside>
-  );
+
+    {/* Standalone Agent Detail / Edit Modal */}
+    {editingSubagent && (
+      <SubagentDetailModal
+        subagent={editingSubagent}
+        onClose={() => setEditingSubagent(null)}
+      />
+    )}
+
+    {/* Rename Agent Modal */}
+    {renamingSubagent && (
+      <RenameSubagentModal
+        subagent={renamingSubagent}
+        onClose={() => setRenamingSubagent(null)}
+      />
+    )}
+  </>
+);
 }
