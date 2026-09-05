@@ -16,85 +16,123 @@ interface MermaidViewerProps {
   code: string;
 }
 
+// Global cache for rendered Mermaid SVGs by code hash/string
+const svgCache = new Map<string, string>();
+
+let mermaidInitialized = false;
+function ensureMermaidInit() {
+  if (mermaidInitialized) return;
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: "dark",
+    securityLevel: "loose",
+    suppressErrorRendering: true,
+    themeVariables: {
+      darkMode: true,
+      background: "#0d1117",
+      primaryColor: "#1f6feb",
+      primaryTextColor: "#ffffff",
+      primaryBorderColor: "#30363d",
+      lineColor: "#58a6ff",
+      secondaryColor: "#161b22",
+      tertiaryColor: "#21262d",
+      fontFamily: "ui-sans-serif, system-ui, sans-serif",
+    },
+  });
+  mermaidInitialized = true;
+}
+
+function processSvg(rawSvg: string): string {
+  return rawSvg.replace(/<svg\b([^>]*)>/i, (_match, attrs) => {
+    let cleanAttrs = attrs;
+    let viewBox = "";
+    const viewBoxMatch = cleanAttrs.match(/viewBox="([^"]+)"/i);
+    if (viewBoxMatch) {
+      viewBox = viewBoxMatch[1];
+    } else {
+      const wMatch = cleanAttrs.match(/width="([0-9.]+)(?:px)?"/i);
+      const hMatch = cleanAttrs.match(/height="([0-9.]+)(?:px)?"/i);
+      if (wMatch && hMatch) {
+        viewBox = `0 0 ${parseFloat(wMatch[1])} ${parseFloat(hMatch[1])}`;
+      }
+    }
+
+    let naturalMaxWidth = "100%";
+    const styleMatch = cleanAttrs.match(/style="([^"]*)"/i);
+    if (styleMatch) {
+      const mwMatch = styleMatch[1].match(/max-width:\s*([0-9.]+px)/i);
+      if (mwMatch) {
+        naturalMaxWidth = mwMatch[1];
+      }
+    }
+    if (naturalMaxWidth === "100%") {
+      const wMatch = cleanAttrs.match(/width="([0-9.]+)(?:px)?"/i);
+      if (wMatch && !cleanAttrs.includes('width="100%"')) {
+        naturalMaxWidth = `${parseFloat(wMatch[1])}px`;
+      }
+    }
+
+    cleanAttrs = cleanAttrs
+      .replace(/\s*style="[^"]*"/gi, "")
+      .replace(/\s*width="[^"]*"/gi, "")
+      .replace(/\s*height="[^"]*"/gi, "")
+      .replace(/\s*viewBox="[^"]*"/gi, "");
+
+    const viewBoxAttr = viewBox ? `viewBox="${viewBox}"` : "";
+    const styleAttr = `style="max-width: min(100%, ${naturalMaxWidth}); width: 100%; height: auto; display: block; margin: 0 auto;"`;
+    return `<svg ${cleanAttrs.trim()} ${viewBoxAttr} ${styleAttr}>`;
+  });
+}
+
 export function MermaidViewer({ code }: MermaidViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [svgContent, setSvgContent] = useState<string>("");
+  const cleanCode = code
+    .replace(/^```(?:mermaid)?\s*/i, "")
+    .replace(/```$/, "")
+    .trim();
+
+  const [svgContent, setSvgContent] = useState<string>(() => svgCache.get(cleanCode) || "");
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(1);
   const [copied, setCopied] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"diagram" | "code">("diagram");
   const { addToast } = useToastStore();
 
-  const cleanCode = code
-    .replace(/^```(?:mermaid)?\s*/i, "")
-    .replace(/```$/, "")
-    .trim();
-
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: "dark",
-      securityLevel: "loose",
-      suppressErrorRendering: true,
-      themeVariables: {
-        darkMode: true,
-        background: "#0d1117",
-        primaryColor: "#1f6feb",
-        primaryTextColor: "#ffffff",
-        primaryBorderColor: "#30363d",
-        lineColor: "#58a6ff",
-        secondaryColor: "#161b22",
-        tertiaryColor: "#21262d",
-        fontFamily: "ui-sans-serif, system-ui, sans-serif",
-      },
-    });
+    if (!cleanCode) return;
+
+    if (svgCache.has(cleanCode)) {
+      setSvgContent(svgCache.get(cleanCode)!);
+      setError(null);
+      return;
+    }
 
     let isMounted = true;
     const timer = setTimeout(async () => {
       if (!cleanCode || !isMounted) return;
+
+      ensureMermaidInit();
 
       // Pre-validate syntax to prevent Mermaid from corrupting the DOM during streaming
       try {
         const isValid = await mermaid.parse(cleanCode, { suppressErrors: true });
         if (isValid === false) return;
       } catch {
+        // Incomplete syntax during streaming - maintain current display without crashing or flashing error
         return;
       }
 
       const id = `mermaid-svg-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       try {
-        setError(null);
         const { svg } = await mermaid.render(id, cleanCode);
-        if (isMounted) {
-          // Force SVG to stay strictly within container bounds without duplicate or overriding attributes
-          const responsiveSvg = svg.replace(/<svg\b([^>]*)>/i, (_match, attrs) => {
-            let cleanAttrs = attrs;
-            let viewBox = "";
-            const viewBoxMatch = cleanAttrs.match(/viewBox="([^"]+)"/i);
-            if (viewBoxMatch) {
-              viewBox = viewBoxMatch[1];
-            } else {
-              const wMatch = cleanAttrs.match(/width="([^"]+)"/i);
-              const hMatch = cleanAttrs.match(/height="([^"]+)"/i);
-              if (wMatch && hMatch) {
-                viewBox = `0 0 ${parseFloat(wMatch[1])} ${parseFloat(hMatch[1])}`;
-              }
-            }
+        if (!isMounted) return;
 
-            // Strip out existing width, height, viewBox, and style attributes so our responsive attributes are authoritative
-            cleanAttrs = cleanAttrs
-              .replace(/\s*style="[^"]*"/gi, "")
-              .replace(/\s*width="[^"]*"/gi, "")
-              .replace(/\s*height="[^"]*"/gi, "")
-              .replace(/\s*viewBox="[^"]*"/gi, "");
-
-            const viewBoxAttr = viewBox ? `viewBox="${viewBox}"` : "";
-            return `<svg ${cleanAttrs} ${viewBoxAttr} width="100%" style="max-width: 100% !important; height: auto !important; width: 100% !important; display: block; margin: 0 auto;">`;
-          });
-          setSvgContent(responsiveSvg);
-        }
+        const responsiveSvg = processSvg(svg);
+        svgCache.set(cleanCode, responsiveSvg);
+        setSvgContent(responsiveSvg);
+        setError(null);
       } catch (err: unknown) {
-        if (isMounted) {
+        if (isMounted && !svgContent) {
           setError(err instanceof Error ? err.message : String(err));
         }
       } finally {
@@ -103,13 +141,13 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
         const tempSvg = document.getElementById(id);
         if (tempSvg && tempSvg.parentElement === document.body) tempSvg.remove();
       }
-    }, 200);
+    }, 300);
 
     return () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [cleanCode]);
+  }, [cleanCode, svgContent]);
 
   const handleCopy = async () => {
     try {
@@ -243,13 +281,18 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
         ) : svgContent ? (
           <div className="w-full min-w-0 flex items-center justify-center">
             <div
-              style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: "center center",
-                transition: "transform 0.15s ease-out",
-              }}
+              style={
+                zoom !== 1
+                  ? {
+                      transform: `scale(${zoom})`,
+                      transformOrigin: "top center",
+                      transition: "transform 0.15s ease-out",
+                      width: zoom > 1 ? `${zoom * 100}%` : "100%",
+                    }
+                  : undefined
+              }
               dangerouslySetInnerHTML={{ __html: svgContent }}
-              className="w-full max-w-full flex items-center justify-center min-w-0 [&>svg]:max-w-full [&>svg]:w-full [&>svg]:h-auto"
+              className="w-full max-w-full flex items-center justify-center min-w-0"
             />
           </div>
         ) : (

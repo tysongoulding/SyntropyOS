@@ -89,7 +89,7 @@ function renderAlertCallout(text: string) {
   return null;
 }
 
-export function MessageItem({ message }: MessageItemProps) {
+export const MessageItem = React.memo(function MessageItem({ message }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const { addToast } = useToastStore();
 
@@ -327,5 +327,5 @@ export function MessageItem({ message }: MessageItemProps) {
       )}
     </div>
   );
-}
+});
 

@@ -19,12 +19,18 @@ export function VirtualizedMessageFeed({ messages }: VirtualizedMessageFeedProps
     overscan: 5,
   });
 
-  // Handle auto-scroll on new streaming chunks
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
+  const lastMessage = messages[messages.length - 1];
+  const lastContentLength = (lastMessage?.content?.length || 0) + (lastMessage?.reasoning?.length || 0);
+
+  // Handle auto-scroll only on message count or new streaming text
   useEffect(() => {
     if (autoScrollRef.current && messages.length > 0) {
-      virtualizer.scrollToIndex(messages.length - 1, { align: "end", behavior: "auto" });
+      virtualizerRef.current.scrollToIndex(messages.length - 1, { align: "end", behavior: "auto" });
     }
-  }, [messages, virtualizer]);
+  }, [messages.length, lastContentLength]);
 
   const handleScroll = () => {
     if (!parentRef.current) return;
@@ -52,7 +58,6 @@ export function VirtualizedMessageFeed({ messages }: VirtualizedMessageFeedProps
       ref={parentRef}
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto"
-      style={{ contain: "strict" }}
     >
       <div className="max-w-5xl mx-auto w-full px-3 sm:px-6 py-4">
         <div
