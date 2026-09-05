@@ -82,11 +82,8 @@ export function supportsThinking(modelName?: string, providerId?: string): boole
 
   // Gemini thinking models
   if (
-    clean.includes("gemini-3.7") ||
-    clean.includes("gemini-3.8") ||
-    clean.includes("thinking") ||
-    clean.includes("gemini-flash-latest") ||
-    clean.includes("gemini-3.5-flash")
+    clean.includes("2.0-flash-thinking") ||
+    clean.includes("thinking")
   ) {
     return true;
   }

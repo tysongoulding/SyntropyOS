@@ -46,10 +46,8 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
     id: "gemini",
     name: "Google Gemini",
     type: "api_key",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "gemini-2.0-flash",
     models: [
-      "gemini-2.5-flash",
-      "gemini-3.1-pro-preview",
       "gemini-2.0-flash",
       "gemini-2.0-flash-lite",
       "gemini-2.0-flash-thinking-exp-01-21",
@@ -166,7 +164,13 @@ const DEPRECATED_MODELS = new Set([
 export function isDeprecatedModel(model?: string): boolean {
   if (!model) return false;
   const m = model.toLowerCase();
-  return DEPRECATED_MODELS.has(m) || m.includes("2.5-pro") || m.includes("1.0");
+  return (
+    DEPRECATED_MODELS.has(m) ||
+    m.includes("2.5") ||
+    m.includes("3.") ||
+    m.includes("1.0") ||
+    m.includes("bison")
+  );
 }
 
 const loadInitialProviders = (): Record<string, ProviderConfig> => {
@@ -207,7 +211,7 @@ const loadInitialActive = (): { provider: string; model: string } => {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.model && isDeprecatedModel(parsed.model)) {
-        parsed.model = "gemini-2.5-flash";
+        parsed.model = "gemini-2.0-flash";
         try {
           localStorage.setItem(STORAGE_KEYS.ACTIVE_SELECTION, JSON.stringify(parsed));
         } catch {}
@@ -215,7 +219,7 @@ const loadInitialActive = (): { provider: string; model: string } => {
       return parsed;
     }
   } catch {}
-  return { provider: "gemini", model: "gemini-2.5-flash" };
+  return { provider: "gemini", model: "gemini-2.0-flash" };
 };
 
 export type ThinkingLevel = "high" | "med" | "low" | "off";
@@ -428,7 +432,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
               (state.activeProviderId === providerId && !discovered.includes(state.activeModel)) ||
               isDeprecatedModel(state.activeModel);
             const fallbackModel = shouldFallback
-              ? (discovered.includes(current.defaultModel) ? current.defaultModel : (discovered[0] || "gemini-2.5-flash"))
+              ? (discovered.includes(current.defaultModel) ? current.defaultModel : (discovered[0] || "gemini-2.0-flash"))
               : state.activeModel;
 
             if (fallbackModel !== state.activeModel) {
@@ -495,7 +499,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
                 (state.activeProviderId === providerId && !discoveredModels.includes(state.activeModel)) ||
                 isDeprecatedModel(state.activeModel);
               const fallbackModel = shouldFallback
-                ? (discoveredModels.includes(current.defaultModel) ? current.defaultModel : (discoveredModels[0] || "gemini-2.5-flash"))
+                ? (discoveredModels.includes(current.defaultModel) ? current.defaultModel : (discoveredModels[0] || "gemini-2.0-flash"))
                 : state.activeModel;
 
               if (fallbackModel !== state.activeModel) {
@@ -565,7 +569,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
 
               const shouldFallback = state.activeProviderId === providerId && !discovered.includes(state.activeModel);
               const fallbackModel = shouldFallback
-                ? (discovered.includes(current.defaultModel) ? current.defaultModel : (discovered[0] || "gemini-2.5-flash"))
+                ? (discovered.includes(current.defaultModel) ? current.defaultModel : (discovered[0] || "gemini-2.0-flash"))
                 : state.activeModel;
 
               if (fallbackModel !== state.activeModel) {

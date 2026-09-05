@@ -18,13 +18,10 @@ export function formatModelDisplayName(
   thinking: ThinkingLevel = "high",
   providerId?: string
 ): string {
-  if (!model) return "Gemini 2.5 Flash";
+  if (!model) return "Gemini 2.0 Flash";
   const clean = model.toLowerCase();
   let base = model;
-  if (clean === "gemini-2.5-flash") base = "Gemini 2.5 Flash";
-  else if (clean.includes("3.1-pro")) base = "Gemini 3.1 Pro Preview";
-  else if (clean === "gemini-2.5-pro") base = "Gemini 2.5 Pro (Deprecated)";
-  else if (clean.includes("2.0-flash-thinking")) base = "Gemini 2.0 Flash Thinking";
+  if (clean.includes("2.0-flash-thinking")) base = "Gemini 2.0 Flash Thinking";
   else if (clean.includes("2.0-pro")) base = "Gemini 2.0 Pro";
   else if (clean.includes("2.0-flash-lite")) base = "Gemini 2.0 Flash Lite";
   else if (clean.includes("2.0-flash")) base = "Gemini 2.0 Flash";

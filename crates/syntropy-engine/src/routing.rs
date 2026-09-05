@@ -48,9 +48,9 @@ pub struct ModelRouter {
 impl Default for ModelRouter {
     fn default() -> Self {
         Self {
-            fast_model: "gemini-2.5-flash".to_string(),
+            fast_model: "gemini-2.0-flash".to_string(),
             fast_provider: ProviderType::Gemini,
-            reasoning_model: "gemini-3.1-pro-preview".to_string(),
+            reasoning_model: "gemini-1.5-pro".to_string(),
             reasoning_provider: ProviderType::Gemini,
         }
     }

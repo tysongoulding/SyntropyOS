@@ -16,10 +16,8 @@ const PROVIDERS: ProviderItem[] = [
   {
     id: "gemini",
     name: "Google Gemini",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "gemini-2.0-flash",
     models: [
-      "gemini-2.5-flash",
-      "gemini-3.1-pro-preview",
       "gemini-2.0-flash",
       "gemini-2.0-flash-lite",
       "gemini-2.0-flash-thinking-exp-01-21",

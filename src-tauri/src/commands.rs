@@ -167,7 +167,8 @@ pub async fn read_all_models_from_cache(
 
 fn is_deprecated_gemini_model(model: &str) -> bool {
     let m = model.to_lowercase();
-    m.contains("2.5-pro")
+    m.contains("2.5")
+        || m.contains("3.")
         || m.contains("1.0")
         || m.contains("bison")
         || m.contains("aqa")
@@ -252,16 +253,8 @@ pub async fn test_provider_key(
                                 }
                             }
                         }
-                        if !models.contains(&"gemini-2.5-flash".to_string()) {
-                            models.insert(0, "gemini-2.5-flash".to_string());
-                        }
-                        if !models.contains(&"gemini-3.1-pro-preview".to_string()) {
-                            models.insert(1, "gemini-3.1-pro-preview".to_string());
-                        }
                         if models.is_empty() {
                             models = vec![
-                                "gemini-2.5-flash".to_string(),
-                                "gemini-3.1-pro-preview".to_string(),
                                 "gemini-2.0-flash".to_string(),
                                 "gemini-2.0-flash-lite".to_string(),
                                 "gemini-2.0-flash-thinking-exp-01-21".to_string(),
@@ -270,15 +263,14 @@ pub async fn test_provider_key(
                             ];
                         }
 
-                        // Sort models prioritizing latest generation
+                        // Sort models prioritizing latest production generation
                         models.sort_by(|a, b| {
                             let score = |name: &str| -> i32 {
-                                if name.starts_with("gemini-2.5-flash") { 100 }
-                                else if name.starts_with("gemini-3.1-pro") { 90 }
-                                else if name.starts_with("gemini-2.0-flash") { 80 }
-                                else if name.starts_with("gemini-2.0") { 70 }
-                                else if name.starts_with("gemini-1.5-flash") { 60 }
-                                else if name.starts_with("gemini-1.5-pro") { 50 }
+                                if name.starts_with("gemini-2.0-flash") { 100 }
+                                else if name.starts_with("gemini-2.0-flash-thinking") { 95 }
+                                else if name.starts_with("gemini-2.0") { 90 }
+                                else if name.starts_with("gemini-1.5-flash") { 80 }
+                                else if name.starts_with("gemini-1.5-pro") { 70 }
                                 else { 10 }
                             };
                             score(b).cmp(&score(a))
@@ -1054,7 +1046,7 @@ pub async fn send_rpc_command(
                 "openai" => "gpt-4o",
                 "anthropic" => "claude-3-7-sonnet-20250219",
                 "xai" => "grok-2-1212",
-                _ => "gemini-2.5-flash",
+                _ => "gemini-2.0-flash",
             });
         let custom_preamble = request.get("preamble").and_then(|v| v.as_str()).unwrap_or("");
         let effective_system_prompt = if custom_preamble.trim().is_empty() {
@@ -1085,16 +1077,16 @@ pub async fn send_rpc_command(
             match requested_provider {
                 "gemini" => {
                     let initial_model = if is_deprecated_gemini_model(requested_model) {
-                        "gemini-2.5-flash".to_string()
+                        "gemini-2.0-flash".to_string()
                     } else {
                         requested_model.to_string()
                     };
 
                     let fallback_candidates = vec![
-                        "gemini-2.5-flash".to_string(),
-                        "gemini-3.1-pro-preview".to_string(),
                         "gemini-2.0-flash".to_string(),
+                        "gemini-2.0-flash-thinking-exp-01-21".to_string(),
                         "gemini-1.5-flash".to_string(),
+                        "gemini-1.5-pro".to_string(),
                     ];
 
                     let mut candidates = vec![initial_model];
