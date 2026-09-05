@@ -24,35 +24,11 @@ const STORAGE_KEY = "rho-lota-chats";
 
 const DEFAULT_CHATS: ChatItem[] = [
   {
-    id: "chat-welcome",
-    title: "Welcome to Rho Lota",
-    createdAt: Date.now() - 3600000,
+    id: "chat-main",
+    title: "New Conversation",
+    createdAt: Date.now(),
     agentId: "coder",
-    messages: [
-      {
-        id: "msg-welcome-1",
-        role: "assistant",
-        content: "Welcome to **Rho Lota**! I am your agentic coding assistant powered by Rho harness. Ask me to refactor code, generate tests, or inspect files.",
-      },
-    ],
-  },
-  {
-    id: "chat-refactor-fsm",
-    title: "FSM Protocol Audit",
-    createdAt: Date.now() - 7200000,
-    agentId: "architect",
-    messages: [
-      {
-        id: "msg-fsm-1",
-        role: "user",
-        content: "Audit the RPC streaming event protocol for zero-copy deserialization.",
-      },
-      {
-        id: "msg-fsm-2",
-        role: "assistant",
-        content: "Inspected `crates/rho-engine/src/protocol.rs`. All stream events deserialize in single-pass buffers.",
-      },
-    ],
+    messages: [],
   },
 ];
 

@@ -1003,22 +1003,13 @@ pub async fn save_lota_settings(
     Ok(())
 }
 
-const MARKDOWN_SYSTEM_INSTRUCTION: &str = r#"You are SyntropyOS AI, an expert autonomous engineering assistant.
-You must ALWAYS format your entire response using rich, clean GitHub Flavored Markdown (GFM).
-
-Strict formatting directives:
-1. Universal Markdown: Format all output with structured headings (#, ##, ###), clear paragraph breaks, bullet lists, and bold/italic emphasis. Never return unstructured raw text.
-2. Code Blocks: Wrap all code, commands, logs, and configuration files in triple-backtick fenced blocks with explicit language tags (e.g. ```rust, ```typescript, ```python, ```bash, ```json, ```yaml, ```html, ```css, etc.).
-3. Diagrams (Mermaid): Whenever explaining workflows, system architectures, state transitions, sequence flows, data lifecycles, or dependency graphs, ALWAYS create visual diagrams using ```mermaid fenced code blocks (flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gitGraph).
-4. Mathematics & Formulas (KaTeX): Render mathematical, statistical, algorithmic complexity, or scientific formulas using LaTeX syntax ($...$ for inline math and $$...$$ for display equations).
-5. Tables: Format structured comparisons, specifications, matrices, or schemas using Markdown tables with headers (| Column | Header |).
-6. Alerts & Callouts: Use GitHub Flavored Markdown callout syntax for important highlights:
-   > [!NOTE]
-   > [!TIP]
-   > [!IMPORTANT]
-   > [!WARNING]
-   > [!CAUTION]
-7. Checklists: Use `- [ ]` and `- [x]` for tasks, milestones, or verification criteria."#;
+const MARKDOWN_SYSTEM_INSTRUCTION: &str = r#"You are an expert autonomous software engineer.
+Respond directly, concisely, and accurately to the user's prompt.
+Strict behavioral constraints:
+1. No Canned Greetings or Filler: NEVER start with greetings (e.g. "Hello! I am SyntropyOS AI"), conversational pleasantries, introductory capability summaries, checklists, or "How can I assist you today?". Start immediately with the solution or direct answer.
+2. Clean Markdown: Use GitHub Flavored Markdown for formatting. Wrap all code in triple-backtick language tags.
+3. Diagrams & Math: Use Mermaid diagrams, Markdown tables, or KaTeX math ONLY when specifically requested by the user or when directly indispensable to answer the query. NEVER output unprompted flowcharts, capability matrices, or entropy formulas on greetings or standard queries.
+4. No Placeholders: Write complete, functional, production-ready code."#;
 
 #[tauri::command]
 pub async fn send_rpc_command(
@@ -1050,7 +1041,7 @@ pub async fn send_rpc_command(
         let effective_system_prompt = if custom_preamble.trim().is_empty() {
             MARKDOWN_SYSTEM_INSTRUCTION.to_string()
         } else {
-            format!("{}\n\n---\n\n{}", custom_preamble.trim(), MARKDOWN_SYSTEM_INSTRUCTION)
+            custom_preamble.trim().to_string()
         };
         let ws_id = format!("ws-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
 

@@ -22,22 +22,28 @@ export interface PreamblePreset {
 
 const DEFAULT_PREAMBLES: PreamblePreset[] = [
   {
+    id: "none",
+    name: "Direct (No System Preamble)",
+    description: "Zero preamble. Raw model output directly answering your prompt.",
+    content: "",
+  },
+  {
     id: "default-coder",
-    name: "Senior Rust & Fullstack Engineer",
-    description: "Production-ready, concise, type-safe code with zero placeholders.",
-    content: "You are an expert autonomous software engineer. Write idiomatic, robust, and clean code. Always format your output in rich GitHub Flavored Markdown with syntax-highlighted code blocks, Mermaid diagrams for architectural workflows, tables, and KaTeX formulas. Follow strict type safety and never emit placeholders.",
+    name: "Senior Software Engineer",
+    description: "Direct, concise, type-safe code with zero placeholders.",
+    content: "You are an expert autonomous software engineer. Answer directly, concisely, and accurately without introductory greetings or conversational filler. Write clean, production-ready code in fenced code blocks.",
   },
   {
     id: "architect",
     name: "Systems Architect & Tech Lead",
     description: "Focuses on high-level system design, cohesion, and boundary isolation.",
-    content: "You are a Principal Systems Architect. Analyze trade-offs, modularity, data flow, and error resilience before implementation. Always structure explanations in GitHub Flavored Markdown with Mermaid sequence and flowchart diagrams, comparison tables, and callouts.",
+    content: "You are a Principal Systems Architect. Analyze trade-offs, modularity, data flow, and error resilience directly and concisely without conversational boilerplate.",
   },
   {
     id: "reviewer",
     name: "Security & Strict Code Reviewer",
     description: "Interrogates changes for edge-case defects, regressions, and safety risks.",
-    content: "You are a strict security and code quality reviewer. Inspect diffs for edge cases, resource leaks, race conditions, and architectural regressions. Always structure findings in GitHub Flavored Markdown with tables, code snippets, and callout warnings.",
+    content: "You are a strict security and code quality reviewer. Inspect diffs for edge cases, resource leaks, race conditions, and architectural regressions concisely without introductory filler.",
   },
 ];
 
@@ -281,7 +287,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
   lastSyncedAt: {},
   isSyncing: {},
   preambles: DEFAULT_PREAMBLES,
-  activePreambleId: "default-coder",
+  activePreambleId: "none",
 
   setThinkingLevel: (level: ThinkingLevel) => {
     try {

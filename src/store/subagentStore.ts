@@ -145,22 +145,7 @@ const loadInitialAgentMessages = (): Record<string, MessageItem[]> => {
     const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
-  return {
-    "sub-implementer": [
-      {
-        id: "msg-impl-1",
-        role: "assistant",
-        content: "I am **build-implementer**. I work the ordered technical plan tasks under strict TDD to turn red tests green without shortcuts.",
-      },
-    ],
-    "sub-qa": [
-      {
-        id: "msg-qa-1",
-        role: "assistant",
-        content: "I am **team-qa**. I inspect code diffs, author test plans, map boundary edges, and safeguard against regressions.",
-      },
-    ],
-  };
+  return {};
 };
 
 export const useSubagentStore = create<SubagentState>((set, get) => ({
@@ -260,14 +245,7 @@ export const useSubagentStore = create<SubagentState>((set, get) => ({
   getAgentMessages: (agentId) => {
     const msgs = get().agentMessages[agentId];
     if (msgs && Array.isArray(msgs)) return msgs;
-    const agent = get().subagents.find((a) => a.id === agentId);
-    return [
-      {
-        id: `init-${agentId}`,
-        role: "assistant",
-        content: `I am **${agent?.name || "Agent"}** (${agent?.role || "Specialist"}). How can I assist you with this workspace?`,
-      },
-    ];
+    return [];
   },
 
   setAgentMessages: (agentId, messages) =>

@@ -2,6 +2,7 @@ import { useEffect, useCallback } from "react";
 import { rhoClient } from "../lib/rpc";
 import { useSessionStore } from "../store/sessionStore";
 import { useProviderStore } from "../store/providerStore";
+import { useSubagentStore } from "../store/subagentStore";
 import { RpcCommand, RpcResponse } from "../lib/protocol";
 
 export function useRhoEngine() {
@@ -18,8 +19,18 @@ export function useRhoEngine() {
 
   const prompt = useCallback((message: string) => {
     const { activeModel, activeProviderId, preambles, activePreambleId } = useProviderStore.getState();
-    const activePreamble = preambles?.find((p) => p.id === activePreambleId);
-    return rhoClient.prompt(message, activeModel, activeProviderId, activePreamble?.content);
+    const { activeChatAgentId, subagents } = useSubagentStore.getState();
+    const activeAgent = subagents?.find((a) => a.id === activeChatAgentId);
+
+    let preambleText: string | undefined;
+    if (activeAgent?.systemPrompt?.trim()) {
+      preambleText = activeAgent.systemPrompt.trim();
+    } else {
+      const activePreamble = preambles?.find((p) => p.id === activePreambleId);
+      preambleText = activePreamble?.content?.trim() || undefined;
+    }
+
+    return rhoClient.prompt(message, activeModel, activeProviderId, preambleText);
   }, []);
 
   const steer = useCallback((message: string) => {
