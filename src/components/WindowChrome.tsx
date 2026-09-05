@@ -1,6 +1,7 @@
 import React from "react";
 import { Minus, Square, X, Cpu } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { APP_VERSION } from "../lib/version";
 
 export const WindowChrome: React.FC = () => {
   const handleMinimize = async () => {
@@ -43,7 +44,7 @@ export const WindowChrome: React.FC = () => {
           Syntropy<span className="text-emerald-400 font-bold">OS</span>
         </span>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
-          v0.1.0
+          v{APP_VERSION}
         </span>
       </div>
 

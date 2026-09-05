@@ -1,5 +1,6 @@
 import { Laptop, Keyboard, RotateCcw, Info, Terminal } from "lucide-react";
 import { useToastStore } from "../../store/toastStore";
+import { APP_VERSION } from "../../lib/version";
 
 export function ApplicationSettings() {
   const { addToast } = useToastStore();
@@ -42,7 +43,7 @@ export function ApplicationSettings() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-[11px]">
           <div className="p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d]">
             <div className="text-[#8b949e] text-[10px] uppercase">Client Version</div>
-            <div className="text-white font-semibold mt-0.5">Lota v0.1.0</div>
+            <div className="text-white font-semibold mt-0.5">SyntropyOS v{APP_VERSION}</div>
           </div>
           <div className="p-2.5 bg-[#0d1117] rounded-lg border border-[#30363d]">
             <div className="text-[#8b949e] text-[10px] uppercase">Engine Core</div>

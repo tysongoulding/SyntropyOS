@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useSessionStore, TurnPhase } from "../../store/sessionStore";
 import { useUiStore } from "../../store/uiStore";
 import { invoke } from "@tauri-apps/api/core";
+import { APP_VERSION, getAppVersion } from "../../lib/version";
 import {
   PanelLeft,
   PanelBottom,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 
 export function Titlebar() {
+  const [version, setVersion] = useState<string>(APP_VERSION);
   const { sessionInfo, usage, turnPhase, resetSession } = useSessionStore();
   const {
     toggleSidebar,
@@ -29,6 +31,10 @@ export function Titlebar() {
     sidebarOpen,
     statusbarOpen,
   } = useUiStore();
+
+  useEffect(() => {
+    getAppVersion().then(setVersion).catch(() => {});
+  }, []);
 
   const handleGoHome = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -131,7 +137,7 @@ export function Titlebar() {
             SyntropyOS
           </span>
           <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#21262d] text-[#8b949e] font-mono border border-[#30363d]">
-            v0.1.0
+            v{version}
           </span>
         </button>
 

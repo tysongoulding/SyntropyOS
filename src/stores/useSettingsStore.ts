@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { SystemStatus } from "@/types/protocol";
+import { APP_VERSION } from "../lib/version";
 
 interface SettingsStore {
   systemStatus: SystemStatus | null;
@@ -20,7 +21,7 @@ interface SettingsStore {
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   systemStatus: {
-    version: "0.1.0",
+    version: APP_VERSION,
     os: "windows",
     app_data_dir: "C:\\Users\\tyson\\AppData\\Roaming\\syntrophyOS",
     extensions_dir: "C:\\Users\\tyson\\.syntrophyOS\\extensions",
