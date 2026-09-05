@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use thiserror::Error;
-use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 #[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlackboardError {
@@ -427,47 +427,50 @@ fn spawn_writer_actor(
     blobs_dir: Option<PathBuf>,
     in_memory_blobs: Arc<RwLock<HashMap<String, String>>>,
 ) {
-    tokio::task::spawn_blocking(move || {
-        while let Some(cmd) = rx.blocking_recv() {
-            match cmd {
-                WriteCommand::PublishArtifact {
-                    caller_agent_id,
-                    artifact,
-                    resp,
-                } => {
-                    let res = handle_publish_artifact(
-                        &mut writer_conn,
-                        &caller_agent_id,
+    std::thread::Builder::new()
+        .name("syntropy-blackboard-writer".to_string())
+        .spawn(move || {
+            while let Some(cmd) = rx.blocking_recv() {
+                match cmd {
+                    WriteCommand::PublishArtifact {
+                        caller_agent_id,
                         artifact,
-                        &blobs_dir,
-                        &in_memory_blobs,
-                        &signal_sender,
-                    );
-                    let _ = resp.send(res);
-                }
-                WriteCommand::UpdateManifest {
-                    caller,
-                    board_id,
-                    target_namespace,
-                    entry,
-                    resp,
-                } => {
-                    let res = handle_update_manifest(
-                        &mut writer_conn,
-                        &caller,
-                        &board_id,
-                        &target_namespace,
+                        resp,
+                    } => {
+                        let res = handle_publish_artifact(
+                            &mut writer_conn,
+                            &caller_agent_id,
+                            artifact,
+                            &blobs_dir,
+                            &in_memory_blobs,
+                            &signal_sender,
+                        );
+                        let _ = resp.send(res);
+                    }
+                    WriteCommand::UpdateManifest {
+                        caller,
+                        board_id,
+                        target_namespace,
                         entry,
-                    );
-                    let _ = resp.send(res);
-                }
-                WriteCommand::FreezeNamespace { namespace, resp } => {
-                    let res = handle_freeze_namespace(&mut writer_conn, &namespace);
-                    let _ = resp.send(res);
+                        resp,
+                    } => {
+                        let res = handle_update_manifest(
+                            &mut writer_conn,
+                            &caller,
+                            &board_id,
+                            &target_namespace,
+                            entry,
+                        );
+                        let _ = resp.send(res);
+                    }
+                    WriteCommand::FreezeNamespace { namespace, resp } => {
+                        let res = handle_freeze_namespace(&mut writer_conn, &namespace);
+                        let _ = resp.send(res);
+                    }
                 }
             }
-        }
-    });
+        })
+        .expect("Failed to spawn blackboard writer actor thread");
 }
 
 fn handle_publish_artifact(
@@ -506,7 +509,7 @@ fn handle_publish_artifact(
             let blob_path = bdir.join(format!("{}.bin", artifact.hash));
             std::fs::write(blob_path, &artifact.content)?;
         } else {
-            let mut map = in_memory_blobs.blocking_write();
+            let mut map = in_memory_blobs.write().unwrap();
             map.insert(artifact.hash.clone(), artifact.content.clone());
         }
         1
@@ -852,7 +855,7 @@ impl BlackboardStore {
                 let blob_path = bdir.join(format!("{}.bin", hash));
                 tokio::fs::read_to_string(blob_path).await?
             } else {
-                let map = self.in_memory_blobs.read().await;
+                let map = self.in_memory_blobs.read().unwrap();
                 map.get(&hash).cloned().unwrap_or_default()
             }
         } else {
@@ -934,7 +937,7 @@ impl BlackboardStore {
                 let blob_path = bdir.join(format!("{}.bin", hash));
                 tokio::fs::read_to_string(blob_path).await?
             } else {
-                let map = self.in_memory_blobs.read().await;
+                let map = self.in_memory_blobs.read().unwrap();
                 map.get(&hash).cloned().unwrap_or_default()
             }
         } else {
@@ -1016,7 +1019,7 @@ impl BlackboardStore {
                     let blob_path = bdir.join(format!("{}.bin", hash));
                     tokio::fs::read_to_string(blob_path).await.unwrap_or_default()
                 } else {
-                    let map = self.in_memory_blobs.read().await;
+                    let map = self.in_memory_blobs.read().unwrap();
                     map.get(&hash).cloned().unwrap_or_default()
                 }
             } else {
