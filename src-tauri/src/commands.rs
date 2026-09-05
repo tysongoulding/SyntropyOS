@@ -86,17 +86,35 @@ pub async fn get_saved_auth_keys(
     Ok(map)
 }
 
+fn is_deprecated_gemini_model(model: &str) -> bool {
+    let m = model.to_lowercase();
+    m.contains("2.5-pro")
+        || m.contains("1.0")
+        || m.contains("bison")
+        || m.contains("aqa")
+        || m.contains("embedding")
+        || m == "gemini-pro"
+        || m == "gemini-pro-vision"
+}
+
 #[tauri::command]
 pub async fn test_provider_key(
     provider: String,
-    key: String,
+    key: Option<String>,
+    state: State<'_, AppState>,
 ) -> Result<TestKeyResponse, String> {
-    let clean_key = key.trim();
+    let resolved_key = if let Some(k) = key.filter(|k| !k.trim().is_empty()) {
+        Some(k)
+    } else {
+        state.keystore.get_secret(&provider).await.ok().flatten().map(|s| s.as_str().to_string())
+    };
+
+    let clean_key = resolved_key.as_deref().unwrap_or("").trim();
     if clean_key.is_empty() {
         return Ok(TestKeyResponse {
             success: false,
             latency_ms: 0,
-            message: "API Key cannot be blank".to_string(),
+            message: format!("No API key found in Keystore for {}. Please enter an API key.", provider),
             models: Vec::new(),
         });
     }
@@ -133,16 +151,24 @@ pub async fn test_provider_key(
                                     if supports_gen {
                                         if let Some(name) = item.get("name").and_then(|n| n.as_str()) {
                                             let clean_name = name.strip_prefix("models/").unwrap_or(name);
-                                            models.push(clean_name.to_string());
+                                            if !is_deprecated_gemini_model(clean_name) {
+                                                models.push(clean_name.to_string());
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                        if !models.contains(&"gemini-2.5-flash".to_string()) {
+                            models.insert(0, "gemini-2.5-flash".to_string());
+                        }
+                        if !models.contains(&"gemini-3.1-pro-preview".to_string()) {
+                            models.insert(1, "gemini-3.1-pro-preview".to_string());
+                        }
                         if models.is_empty() {
                             models = vec![
                                 "gemini-2.5-flash".to_string(),
-                                "gemini-2.5-pro".to_string(),
+                                "gemini-3.1-pro-preview".to_string(),
                                 "gemini-2.0-flash".to_string(),
                                 "gemini-2.0-flash-lite".to_string(),
                                 "gemini-2.0-flash-thinking-exp-01-21".to_string(),
@@ -150,10 +176,36 @@ pub async fn test_provider_key(
                                 "gemini-1.5-pro".to_string(),
                             ];
                         }
+
+                        // Live probe to verify model generation actually succeeds
+                        let mut verified_working_model = String::new();
+                        for candidate in models.iter().take(3) {
+                            let ping_url = format!(
+                                "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                                candidate,
+                                clean_key
+                            );
+                            let ping_body = serde_json::json!({
+                                "contents": [{ "role": "user", "parts": [{ "text": "ping" }] }]
+                            });
+                            if let Ok(ping_resp) = client.post(&ping_url).json(&ping_body).send().await {
+                                if ping_resp.status().is_success() {
+                                    verified_working_model = candidate.clone();
+                                    break;
+                                }
+                            }
+                        }
+
+                        let message = if !verified_working_model.is_empty() {
+                            format!("Google Gemini Verified & Active (Tested generateContent on {}, {} models available)", verified_working_model, models.len())
+                        } else {
+                            format!("Google Gemini Verified ({}, {} models discovered)", status.as_u16(), models.len())
+                        };
+
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("Google Gemini Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            message,
                             models,
                         })
                     } else {
@@ -509,7 +561,7 @@ pub async fn fetch_provider_models(
             });
         }
     };
-    test_provider_key(provider, key).await
+    test_provider_key(provider, Some(key), state).await
 }
 
 #[tauri::command]
@@ -667,44 +719,97 @@ pub async fn send_rpc_command(
         let (full_response, reasoning_text) = if let Some(key) = provider_key {
             match requested_provider {
                 "gemini" => {
-                    let url = format!(
-                        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-                        requested_model,
-                        key.as_str()
-                    );
-                    let body = serde_json::json!({
-                        "systemInstruction": {
-                            "parts": [{ "text": effective_system_prompt }]
-                        },
-                        "contents": [
-                            {
-                                "role": "user",
-                                "parts": [{ "text": message }]
-                            }
-                        ]
-                    });
+                    let initial_model = if is_deprecated_gemini_model(requested_model) {
+                        "gemini-2.5-flash".to_string()
+                    } else {
+                        requested_model.to_string()
+                    };
 
-                    match client.post(&url).json(&body).send().await {
-                        Ok(resp) => {
-                            let status = resp.status();
-                            if status.is_success() {
-                                let data: serde_json::Value = resp.json().await.unwrap_or_default();
-                                let text = data["candidates"][0]["content"]["parts"][0]["text"]
-                                    .as_str()
-                                    .unwrap_or("No response content generated from Gemini.")
-                                    .to_string();
-                                (text, String::new())
-                            } else {
-                                let err_body = resp.text().await.unwrap_or_default();
-                                let msg = serde_json::from_str::<serde_json::Value>(&err_body)
-                                    .ok()
-                                    .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
-                                    .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
-                                (format!("⚠️ Google Gemini API Error: {}", msg), String::new())
+                    let fallback_candidates = vec![
+                        "gemini-2.5-flash".to_string(),
+                        "gemini-3.1-pro-preview".to_string(),
+                        "gemini-2.0-flash".to_string(),
+                        "gemini-1.5-flash".to_string(),
+                    ];
+
+                    let mut candidates = vec![initial_model];
+                    for fb in fallback_candidates {
+                        if !candidates.contains(&fb) {
+                            candidates.push(fb);
+                        }
+                    }
+
+                    let mut final_text = String::new();
+                    let final_reasoning = String::new();
+
+                    for (idx, candidate) in candidates.iter().enumerate() {
+                        let url = format!(
+                            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                            candidate,
+                            key.as_str()
+                        );
+                        let body = serde_json::json!({
+                            "systemInstruction": {
+                                "parts": [{ "text": effective_system_prompt }]
+                            },
+                            "contents": [
+                                {
+                                    "role": "user",
+                                    "parts": [{ "text": message }]
+                                }
+                            ]
+                        });
+
+                        match client.post(&url).json(&body).send().await {
+                            Ok(resp) => {
+                                let status = resp.status();
+                                if status.is_success() {
+                                    let data: serde_json::Value = resp.json().await.unwrap_or_default();
+                                    let text = data["candidates"][0]["content"]["parts"][0]["text"]
+                                        .as_str()
+                                        .unwrap_or("No response content generated from Gemini.")
+                                        .to_string();
+
+                                    if candidate != requested_model {
+                                        final_text = format!(
+                                            "> [!NOTE]\n> Google reported that `{}` is no longer available. SyntropyOS automatically routed your request to `{}`.\n\n{}",
+                                            requested_model,
+                                            candidate,
+                                            text
+                                        );
+                                    } else {
+                                        final_text = text;
+                                    }
+                                    break;
+                                } else {
+                                    let err_body = resp.text().await.unwrap_or_default();
+                                    let msg = serde_json::from_str::<serde_json::Value>(&err_body)
+                                        .ok()
+                                        .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                                        .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+
+                                    let is_model_unavailable = msg.contains("no longer available")
+                                        || msg.contains("not found")
+                                        || msg.contains("not supported")
+                                        || msg.contains("deprecated")
+                                        || status.as_u16() == 404;
+
+                                    if !is_model_unavailable || idx == candidates.len() - 1 {
+                                        final_text = format!("⚠️ Google Gemini API Error: {}", msg);
+                                        break;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                if idx == candidates.len() - 1 {
+                                    final_text = format!("⚠️ Google Gemini Connection Error: {}", e);
+                                    break;
+                                }
                             }
                         }
-                        Err(e) => (format!("⚠️ Google Gemini Connection Error: {}", e), String::new()),
                     }
+
+                    (final_text, final_reasoning)
                 }
                 "openai" | "xai" => {
                     let endpoint = if requested_provider == "xai" {

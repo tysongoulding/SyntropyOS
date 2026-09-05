@@ -63,7 +63,7 @@ fn test_deterministic_failover_chains() {
     };
     let lead_chain = router.failover_chain(&lead_task);
     assert!(lead_chain.len() >= 3, "Reasoning tier must have failover options");
-    assert_eq!(lead_chain[0].model_name, "gemini-2.5-pro");
+    assert_eq!(lead_chain[0].model_name, "gemini-3.1-pro-preview");
     assert_eq!(lead_chain[1].model_name, "claude-3-7-sonnet");
     assert_eq!(lead_chain[2].model_name, "o3-mini");
 }
