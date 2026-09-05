@@ -99,7 +99,17 @@ export type WorkstreamCommand =
   | {
       command: "verify_invariants";
       board_id: string;
+    }
+  | {
+      command: "web_search";
+      query: string;
     };
+
+export interface SearchResult {
+  title: string;
+  snippet: string;
+  url: string;
+}
 
 export interface PromptConfigDto {
   role: string;

@@ -10,6 +10,8 @@ export interface AutocompleteItem {
 }
 
 const STATIC_SUGGESTIONS: AutocompleteItem[] = [
+  { key: "/search", label: "/search", description: "Search the internet with live web results & citations", type: "command" },
+  { key: "/browser", label: "/browser", description: "Browse web documentation and online resources", type: "command" },
   { key: "@create-plugin", label: "@create-plugin", description: "Scaffold a new MCP tool or plugin", type: "skill" },
   { key: "@plan", label: "@plan", description: "Design implementation plan", type: "skill" },
   { key: "@spec", label: "@spec", description: "Generate specification doc", type: "skill" },

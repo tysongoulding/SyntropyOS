@@ -118,4 +118,36 @@ async fn test_models_cache_read_write() {
     let _ = tokio::fs::remove_dir_all(&temp_dir).await;
 }
 
+#[test]
+fn test_web_search_protocol_and_intent() {
+    use syntropy_os_lib::protocol::{SearchResult, WorkstreamCommand};
+    use syntropy_os_lib::commands::is_search_intent;
+
+    // Test SearchResult serialization
+    let res = SearchResult {
+        title: "Playwright Testing".to_string(),
+        snippet: "Fast and reliable end-to-end testing".to_string(),
+        url: "https://playwright.dev".to_string(),
+    };
+    let json = serde_json::to_string(&res).unwrap();
+    assert!(json.contains("Playwright Testing"));
+    assert!(json.contains("https://playwright.dev"));
+
+    // Test WebSearch command variant
+    let cmd = WorkstreamCommand::WebSearch {
+        query: "playwright e2e".to_string(),
+    };
+    let cmd_json = serde_json::to_string(&cmd).unwrap();
+    assert!(cmd_json.contains("web_search"));
+    assert!(cmd_json.contains("playwright e2e"));
+
+    // Test search intent detection
+    assert!(is_search_intent("/search rust lang"));
+    assert!(is_search_intent("/browser nextjs"));
+    assert!(is_search_intent("please search the internet for playwright"));
+    assert!(is_search_intent("Search the web for react 19"));
+    assert!(is_search_intent("search for kubernetes"));
+    assert!(!is_search_intent("write a rust function to parse json"));
+}
+
 

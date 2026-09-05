@@ -19,6 +19,7 @@ import {
   X,
   BarChart3,
   Mic,
+  Globe,
 } from "lucide-react";
 
 interface PromptInputProps {
@@ -27,6 +28,7 @@ interface PromptInputProps {
 
 export function PromptInput({ placeholder }: PromptInputProps = {}) {
   const [text, setText] = useState("");
+  const [isWebSearch, setIsWebSearch] = useState(false);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteFilter, setAutocompleteFilter] = useState("");
   const [showContextModal, setShowContextModal] = useState(false);
@@ -71,8 +73,8 @@ export function PromptInput({ placeholder }: PromptInputProps = {}) {
     clearAttachedFiles();
     setShowAutocomplete(false);
     addUserMessage(content);
-    await prompt(content);
-  }, [text, attachedFiles, isRunning, enqueue, addUserMessage, prompt, clearAttachedFiles]);
+    await prompt(content, isWebSearch);
+  }, [text, attachedFiles, isRunning, enqueue, addUserMessage, prompt, clearAttachedFiles, isWebSearch]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
@@ -113,7 +115,8 @@ export function PromptInput({ placeholder }: PromptInputProps = {}) {
   };
 
   const handleOpenBrowserTool = () => {
-    setText((prev) => `${prev}${prev.endsWith(" ") || prev === "" ? "" : " "}/browser `);
+    setIsWebSearch(true);
+    addToast("Live Web Search enabled for this prompt", "info");
     textareaRef.current?.focus();
   };
 
@@ -174,7 +177,7 @@ export function PromptInput({ placeholder }: PromptInputProps = {}) {
 
         {/* Bottom Toolbar Row */}
         <div className="flex items-center justify-between pt-1 text-xs text-[#8b949e]">
-          {/* Left: Plus Context Dropup + Model Name ^ + Usage */}
+          {/* Left: Plus Context Dropup + Model Name ^ + Search + Usage */}
           <div className="flex items-center space-x-2">
             <AddContextDropup
               onInsertMention={handleInsertChar}
@@ -184,6 +187,28 @@ export function PromptInput({ placeholder }: PromptInputProps = {}) {
             <AgentDropupPicker />
 
             <ModelDropupPicker />
+
+            {/* Web Search Toggle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsWebSearch((prev) => {
+                  const next = !prev;
+                  addToast(next ? "Live Web Search enabled" : "Live Web Search disabled", "info");
+                  return next;
+                });
+              }}
+              className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer border ${
+                isWebSearch
+                  ? "bg-[#58a6ff]/15 text-[#58a6ff] border-[#58a6ff]/40 shadow-sm shadow-[#58a6ff]/10"
+                  : "text-[#8b949e] hover:text-white hover:bg-[#27272a] border-transparent"
+              }`}
+              title={isWebSearch ? "Web Search active (live internet groundings & sources)" : "Toggle live web search (DuckDuckGo / Google Search)"}
+            >
+              <Globe className={`w-3 h-3 ${isWebSearch ? "text-[#58a6ff]" : "text-[#8b949e]"}`} />
+              <span>Search</span>
+              {isWebSearch && <span className="w-1.5 h-1.5 rounded-full bg-[#58a6ff] animate-pulse" />}
+            </button>
 
             <button
               type="button"

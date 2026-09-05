@@ -46,6 +46,16 @@ pub enum WorkstreamCommand {
     VerifyInvariants {
         board_id: String,
     },
+    WebSearch {
+        query: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub title: String,
+    pub snippet: String,
+    pub url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

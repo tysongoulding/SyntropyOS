@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, State, Window};
 
 use crate::paths::AppPaths;
 use crate::protocol::{
-    PromptConfigDto, RpcEvent, SystemStatus, TestKeyResponse, WorkstreamCommand, WorkstreamEvent,
+    PromptConfigDto, RpcEvent, SearchResult, SystemStatus, TestKeyResponse, WorkstreamCommand, WorkstreamEvent,
 };
 use crate::keystore::SecureKeystore;
 use syntropy_core::blackboard::{BlackboardArtifact, BlackboardStore};
@@ -1003,6 +1003,177 @@ pub async fn save_lota_settings(
     Ok(())
 }
 
+fn clean_html_snippet(raw: &str) -> String {
+    let without_tags = raw
+        .replace("<b>", "")
+        .replace("</b>", "")
+        .replace("<i>", "")
+        .replace("</i>", "")
+        .replace("<p>", "")
+        .replace("</p>", "")
+        .replace("<br>", " ")
+        .replace("<br/>", " ");
+    without_tags
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#x27;", "'")
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&nbsp;", " ")
+        .trim()
+        .to_string()
+}
+
+fn urlencoding_decode(s: &str) -> String {
+    if let Ok(parsed) = reqwest::Url::parse(&format!("https://dummy.internal/?q={}", s)) {
+        for (k, v) in parsed.query_pairs() {
+            if k == "q" {
+                return v.into_owned();
+            }
+        }
+    }
+    s.to_string()
+}
+
+fn urlencoding_encode(s: &str) -> String {
+    if let Ok(mut parsed) = reqwest::Url::parse("https://dummy.internal") {
+        parsed.query_pairs_mut().append_pair("q", s);
+        return parsed.query().and_then(|q| q.strip_prefix("q=")).unwrap_or(s).to_string();
+    }
+    s.to_string()
+}
+
+pub fn is_search_intent(message: &str) -> bool {
+    let lower = message.trim().to_lowercase();
+    lower.starts_with("/search")
+        || lower.starts_with("/browser")
+        || lower.contains("search the internet")
+        || lower.contains("search the web")
+        || lower.contains("search online")
+        || lower.contains("look up online")
+        || lower.contains("browse the web")
+        || lower.starts_with("search for ")
+        || lower.starts_with("google ")
+}
+
+pub async fn perform_web_search(query: &str) -> Result<Vec<SearchResult>, String> {
+    let clean_query = query.trim();
+    if clean_query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_default();
+
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    // 1. DuckDuckGo HTML Search
+    let ddg_res = client
+        .post("https://html.duckduckgo.com/html/")
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+        .form(&[("q", clean_query)])
+        .send()
+        .await;
+
+    if let Ok(resp) = ddg_res {
+        if resp.status().is_success() {
+            if let Ok(html) = resp.text().await {
+                let parts: Vec<&str> = html.split("<div class=\"result results_links").collect();
+                for part in parts.iter().skip(1).take(6) {
+                    let title = if let Some(t_idx) = part.find("class=\"result__a\"") {
+                        let sub = &part[t_idx..];
+                        if let (Some(s), Some(e)) = (sub.find('>'), sub.find("</a>")) {
+                            clean_html_snippet(&sub[s + 1..e])
+                        } else {
+                            String::new()
+                        }
+                    } else {
+                        String::new()
+                    };
+
+                    let url = if let Some(h_idx) = part.find("href=\"") {
+                        let sub = &part[h_idx + 6..];
+                        if let Some(e_idx) = sub.find('"') {
+                            let raw_href = &sub[..e_idx];
+                            if let Some(uddg_idx) = raw_href.find("uddg=") {
+                                let uddg_val = &raw_href[uddg_idx + 5..];
+                                let end_val = uddg_val.find('&').unwrap_or(uddg_val.len());
+                                let encoded = &uddg_val[..end_val];
+                                urlencoding_decode(encoded)
+                            } else if raw_href.starts_with("//") {
+                                format!("https:{}", raw_href)
+                            } else {
+                                raw_href.to_string()
+                            }
+                        } else {
+                            String::new()
+                        }
+                    } else {
+                        String::new()
+                    };
+
+                    let snippet = if let Some(s_idx) = part.find("class=\"result__snippet") {
+                        let sub = &part[s_idx..];
+                        if let (Some(s), Some(e)) = (sub.find('>'), sub.find("</a>")) {
+                            clean_html_snippet(&sub[s + 1..e])
+                        } else {
+                            String::new()
+                        }
+                    } else {
+                        String::new()
+                    };
+
+                    if !title.is_empty() && !url.is_empty() && !url.contains("duckduckgo.com") {
+                        results.push(SearchResult {
+                            title,
+                            snippet,
+                            url,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Wikipedia OpenSearch fallback if results < 2
+    if results.len() < 2 {
+        let wiki_url = format!(
+            "https://en.wikipedia.org/w/api.php?action=opensearch&search={}&limit=3&namespace=0&format=json",
+            urlencoding_encode(clean_query)
+        );
+        if let Ok(w_resp) = client.get(&wiki_url).header("User-Agent", "SyntropyOS/0.2.0 (desktop)").send().await {
+            if w_resp.status().is_success() {
+                if let Ok(w_data) = w_resp.json::<serde_json::Value>().await {
+                    if let (Some(titles), Some(snippets), Some(urls)) = (
+                        w_data.get(1).and_then(|v| v.as_array()),
+                        w_data.get(2).and_then(|v| v.as_array()),
+                        w_data.get(3).and_then(|v| v.as_array()),
+                    ) {
+                        for (i, t) in titles.iter().enumerate() {
+                            let title = t.as_str().unwrap_or("").to_string();
+                            let snippet = snippets.get(i).and_then(|s| s.as_str()).unwrap_or("").to_string();
+                            let url = urls.get(i).and_then(|u| u.as_str()).unwrap_or("").to_string();
+                            if !title.is_empty() && !url.is_empty() && !results.iter().any(|r| r.url == url) {
+                                results.push(SearchResult { title, snippet, url });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn search_web(query: String) -> Result<Vec<SearchResult>, String> {
+    perform_web_search(&query).await
+}
+
 const MARKDOWN_SYSTEM_INSTRUCTION: &str = r#"You are an expert autonomous software engineer.
 Respond directly, concisely, and accurately to the user's prompt.
 Strict behavioral constraints:
@@ -1020,8 +1191,44 @@ pub async fn send_rpc_command(
     let req_id = request.get("id").and_then(|v| v.as_str()).unwrap_or("req-0").to_string();
     let cmd_type = request.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
 
+    if cmd_type == "web_search" || cmd_type == "search" {
+        let query = request.get("query").and_then(|v| v.as_str()).unwrap_or("");
+        let results = perform_web_search(query).await.unwrap_or_default();
+        return Ok(serde_json::json!({
+            "id": req_id,
+            "type": "response",
+            "command": cmd_type,
+            "success": true,
+            "data": { "results": results },
+            "error": null
+        }));
+    }
+
     if cmd_type == "prompt" {
         let message = request.get("message").and_then(|v| v.as_str()).unwrap_or("");
+        let is_search_cmd = message.starts_with("/search ")
+            || message.starts_with("/browser ")
+            || is_search_intent(message);
+        let enable_web_search = request.get("web_search").and_then(|v| v.as_bool()).unwrap_or(false) || is_search_cmd;
+
+        let clean_message = if let Some(s) = message.strip_prefix("/search ") {
+            s.trim()
+        } else if let Some(s) = message.strip_prefix("/browser ") {
+            s.trim()
+        } else {
+            message.trim()
+        };
+
+        let search_query = if let Some(s) = clean_message.strip_prefix("search the internet for ") {
+            s.trim()
+        } else if let Some(s) = clean_message.strip_prefix("search the web for ") {
+            s.trim()
+        } else if let Some(s) = clean_message.strip_prefix("search for ") {
+            s.trim()
+        } else {
+            clean_message
+        };
+
         let requested_provider = request
             .get("provider")
             .and_then(|v| v.as_str())
@@ -1050,9 +1257,16 @@ pub async fn send_rpc_command(
             "rho://event",
             RpcEvent::TurnStart {
                 turn_number: 1,
-                prompt: message.to_string(),
+                prompt: clean_message.to_string(),
             },
         );
+
+        // Pre-fetch native web search results if enabled
+        let web_results = if enable_web_search {
+            perform_web_search(search_query).await.unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
         // 2. Retrieve key/token from hardware Keystore
         let provider_key = state.keystore.get_secret(requested_provider).await.ok().flatten();
@@ -1094,27 +1308,71 @@ pub async fn send_rpc_command(
                             candidate,
                             key.as_str()
                         );
-                        let body = serde_json::json!({
-                            "systemInstruction": {
-                                "parts": [{ "text": effective_system_prompt }]
-                            },
-                            "contents": [
-                                {
-                                    "role": "user",
-                                    "parts": [{ "text": message }]
-                                }
-                            ]
-                        });
+                        let body = if enable_web_search {
+                            serde_json::json!({
+                                "systemInstruction": {
+                                    "parts": [{ "text": effective_system_prompt }]
+                                },
+                                "contents": [
+                                    {
+                                        "role": "user",
+                                        "parts": [{ "text": clean_message }]
+                                    }
+                                ],
+                                "tools": [
+                                    { "googleSearch": {} }
+                                ]
+                            })
+                        } else {
+                            serde_json::json!({
+                                "systemInstruction": {
+                                    "parts": [{ "text": effective_system_prompt }]
+                                },
+                                "contents": [
+                                    {
+                                        "role": "user",
+                                        "parts": [{ "text": clean_message }]
+                                    }
+                                ]
+                            })
+                        };
 
                         match client.post(&url).json(&body).send().await {
                             Ok(resp) => {
                                 let status = resp.status();
                                 if status.is_success() {
                                     let data: serde_json::Value = resp.json().await.unwrap_or_default();
-                                    let text = data["candidates"][0]["content"]["parts"][0]["text"]
+                                    let mut text = data["candidates"][0]["content"]["parts"][0]["text"]
                                         .as_str()
                                         .unwrap_or("No response content generated from Gemini.")
                                         .to_string();
+
+                                    // Extract grounding metadata sources
+                                    if let Some(grounding) = data["candidates"][0].get("groundingMetadata") {
+                                        let mut sources = Vec::new();
+                                        if let Some(chunks) = grounding.get("groundingChunks").and_then(|c| c.as_array()) {
+                                            for chunk in chunks {
+                                                if let Some(web) = chunk.get("web") {
+                                                    let uri = web.get("uri").and_then(|u| u.as_str()).unwrap_or("");
+                                                    let title = web.get("title").and_then(|t| t.as_str()).unwrap_or(uri);
+                                                    if !uri.is_empty() && !sources.iter().any(|(u, _)| u == uri) {
+                                                        sources.push((uri.to_string(), title.to_string()));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if !sources.is_empty() {
+                                            text.push_str("\n\n---\n**🌐 Web Sources Consulted:**\n");
+                                            for (uri, title) in sources {
+                                                text.push_str(&format!("- [{}]({})\n", title, uri));
+                                            }
+                                        }
+                                    } else if enable_web_search && !web_results.is_empty() {
+                                        text.push_str("\n\n---\n**🌐 Web Sources Consulted:**\n");
+                                        for res in web_results.iter().take(4) {
+                                            text.push_str(&format!("- [{}]({})\n", res.title, res.url));
+                                        }
+                                    }
 
                                     if candidate != requested_model {
                                         final_text = format!(
@@ -1133,6 +1391,44 @@ pub async fn send_rpc_command(
                                         .ok()
                                         .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
                                         .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+
+                                    // Fallback retry without googleSearch tool if model candidate does not support tools
+                                    if enable_web_search && (msg.contains("Tool") || msg.contains("googleSearch") || msg.contains("unsupported")) {
+                                        let fallback_prompt = if !web_results.is_empty() {
+                                            let mut ctx = format!("Live Web Search Results for '{}':\n\n", search_query);
+                                            for (i, r) in web_results.iter().take(4).enumerate() {
+                                                ctx.push_str(&format!("{}. [{}]({})\n   {}\n\n", i + 1, r.title, r.url, r.snippet));
+                                            }
+                                            ctx.push_str("Based on the live web search results above, answer the prompt directly and cite source URLs.\n\nUser Question: ");
+                                            ctx.push_str(clean_message);
+                                            ctx
+                                        } else {
+                                            clean_message.to_string()
+                                        };
+
+                                        let fallback_body = serde_json::json!({
+                                            "systemInstruction": {
+                                                "parts": [{ "text": effective_system_prompt }]
+                                            },
+                                            "contents": [
+                                                {
+                                                    "role": "user",
+                                                    "parts": [{ "text": fallback_prompt }]
+                                                }
+                                            ]
+                                        });
+
+                                        if let Ok(retry_resp) = client.post(&url).json(&fallback_body).send().await {
+                                            if retry_resp.status().is_success() {
+                                                let retry_data: serde_json::Value = retry_resp.json().await.unwrap_or_default();
+                                                final_text = retry_data["candidates"][0]["content"]["parts"][0]["text"]
+                                                    .as_str()
+                                                    .unwrap_or("No response generated.")
+                                                    .to_string();
+                                                break;
+                                            }
+                                        }
+                                    }
 
                                     let is_model_unavailable = msg.contains("no longer available")
                                         || msg.contains("not found")
@@ -1163,11 +1459,24 @@ pub async fn send_rpc_command(
                     } else {
                         "https://api.openai.com/v1/chat/completions"
                     };
+
+                    let user_content = if enable_web_search && !web_results.is_empty() {
+                        let mut ctx = format!("Live Web Search Results for '{}':\n\n", search_query);
+                        for (i, r) in web_results.iter().take(5).enumerate() {
+                            ctx.push_str(&format!("{}. [{}]({})\n   {}\n\n", i + 1, r.title, r.url, r.snippet));
+                        }
+                        ctx.push_str("Based on the live web search results above, answer the prompt directly and cite the source URLs as markdown links.\n\nUser Question: ");
+                        ctx.push_str(clean_message);
+                        ctx
+                    } else {
+                        clean_message.to_string()
+                    };
+
                     let body = serde_json::json!({
                         "model": requested_model,
                         "messages": [
                             { "role": "system", "content": effective_system_prompt },
-                            { "role": "user", "content": message }
+                            { "role": "user", "content": user_content }
                         ]
                     });
 
@@ -1205,11 +1514,23 @@ pub async fn send_rpc_command(
                 }
                 "anthropic" => {
                     let endpoint = "https://api.anthropic.com/v1/messages";
+                    let user_content = if enable_web_search && !web_results.is_empty() {
+                        let mut ctx = format!("Live Web Search Results for '{}':\n\n", search_query);
+                        for (i, r) in web_results.iter().take(5).enumerate() {
+                            ctx.push_str(&format!("{}. [{}]({})\n   {}\n\n", i + 1, r.title, r.url, r.snippet));
+                        }
+                        ctx.push_str("Based on the live web search results above, answer the prompt directly and cite the source URLs as markdown links.\n\nUser Question: ");
+                        ctx.push_str(clean_message);
+                        ctx
+                    } else {
+                        clean_message.to_string()
+                    };
+
                     let body = serde_json::json!({
                         "model": requested_model,
                         "max_tokens": 4096,
                         "system": effective_system_prompt,
-                        "messages": [{ "role": "user", "content": message }]
+                        "messages": [{ "role": "user", "content": user_content }]
                     });
 
                     match client
@@ -1258,16 +1579,28 @@ pub async fn send_rpc_command(
                 ),
             }
         } else {
-            (
-                format!(
-                    "### ⚠️ {} Setup Required\n\nNo credentials configured for **{}** in the hardware Keystore.\n\n> [!TIP]\n> Navigate to **Settings -> Cloud Providers & API Keys** to configure your {} API key or OAuth session to activate live inference.\n\n```text\n(Local Echo: {})\n```",
-                    requested_provider.to_uppercase(),
-                    requested_provider.to_uppercase(),
-                    requested_provider,
-                    message
-                ),
-                String::new(),
-            )
+            if enable_web_search && !web_results.is_empty() {
+                let mut search_summary = format!("### 🌐 Live Web Search Results for `{}`\n\n", search_query);
+                for (i, res) in web_results.iter().take(5).enumerate() {
+                    search_summary.push_str(&format!("{}. **[{}]({})**\n   {}\n\n", i + 1, res.title, res.url, res.snippet));
+                }
+                search_summary.push_str(&format!(
+                    "> [!NOTE]\n> Web search completed natively via SyntropyOS. To have an AI model synthesize and reason over these results, configure your **{}** API key in Settings.",
+                    requested_provider.to_uppercase()
+                ));
+                (search_summary, String::new())
+            } else {
+                (
+                    format!(
+                        "### ⚠️ {} Setup Required\n\nNo credentials configured for **{}** in the hardware Keystore.\n\n> [!TIP]\n> Navigate to **Settings -> Cloud Providers & API Keys** to configure your {} API key or OAuth session to activate live inference.\n\n```text\n(Local Echo: {})\n```",
+                        requested_provider.to_uppercase(),
+                        requested_provider.to_uppercase(),
+                        requested_provider,
+                        clean_message
+                    ),
+                    String::new(),
+                )
+            }
         };
 
         // 3a. Stream reasoning chunks if present
@@ -1487,6 +1820,11 @@ pub async fn execute_command(
 
         WorkstreamCommand::VerifyInvariants { board_id } => {
             verify_invariants(state, board_id).await
+        }
+
+        WorkstreamCommand::WebSearch { query } => {
+            let res = perform_web_search(&query).await?;
+            serde_json::to_value(res).map_err(|e| e.to_string())
         }
     }
 }

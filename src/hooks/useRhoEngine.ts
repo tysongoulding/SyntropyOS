@@ -17,7 +17,7 @@ export function useRhoEngine() {
     return rhoClient.sendCommand(command);
   }, []);
 
-  const prompt = useCallback((message: string) => {
+  const prompt = useCallback((message: string, webSearch?: boolean) => {
     const { activeModel, activeProviderId, preambles, activePreambleId } = useProviderStore.getState();
     const { activeChatAgentId, subagents } = useSubagentStore.getState();
     const activeAgent = subagents?.find((a) => a.id === activeChatAgentId);
@@ -30,7 +30,7 @@ export function useRhoEngine() {
       preambleText = activePreamble?.content?.trim() || undefined;
     }
 
-    return rhoClient.prompt(message, activeModel, activeProviderId, preambleText);
+    return rhoClient.prompt(message, activeModel, activeProviderId, preambleText, webSearch);
   }, []);
 
   const steer = useCallback((message: string) => {

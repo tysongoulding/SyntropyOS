@@ -70,14 +70,19 @@ export class RhoClient {
     };
   }
 
-  public prompt(message: string, model?: string, provider?: string, preamble?: string) {
+  public prompt(message: string, model?: string, provider?: string, preamble?: string, webSearch?: boolean) {
     return this.sendCommand({
       type: "prompt",
       message,
       ...(model ? { model } : {}),
       ...(provider ? { provider } : {}),
       ...(preamble ? { preamble } : {}),
+      ...(webSearch ? { web_search: true } : {}),
     });
+  }
+
+  public searchWeb(query: string) {
+    return this.sendCommand({ type: "web_search", query });
   }
 
   public steer(message: string) {

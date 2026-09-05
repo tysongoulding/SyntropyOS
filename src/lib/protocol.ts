@@ -1,7 +1,8 @@
 // Strongly-typed RPC protocol matching crates/rho-harness-core/src/rpc/protocol.rs
 
 export type RpcCommand =
-  | { type: "prompt"; message: string; model?: string; provider?: string; preamble?: string; images?: unknown[]; streaming_behavior?: string }
+  | { type: "prompt"; message: string; model?: string; provider?: string; preamble?: string; images?: unknown[]; streaming_behavior?: string; web_search?: boolean }
+  | { type: "web_search"; query: string }
   | { type: "steer"; message: string }
   | { type: "abort" }
   | { type: "tool_response"; approval_id: string; decision: "allow" | "deny" | string }

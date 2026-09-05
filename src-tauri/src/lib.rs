@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use commands::{
     close_window, execute_command, fetch_all_provider_models, fetch_provider_models, get_blackboard_manifest, get_blackboard_presentation,
     get_cached_models, get_prompt_config, get_saved_auth_keys, load_lota_settings, minimize_window, open_external_url,
-    open_local_path, save_custom_prompt, save_lota_settings, send_rpc_command, start_drag_window,
+    open_local_path, save_custom_prompt, save_lota_settings, search_web, send_rpc_command, start_drag_window,
     start_oauth_login, sync_provider_keys, test_provider_key, toggle_maximize_window, verify_invariants, AppState,
 };
 use keystore::SecureKeystore;
@@ -59,6 +59,7 @@ pub fn run() {
             start_oauth_login,
             load_lota_settings,
             save_lota_settings,
+            search_web,
             send_rpc_command,
             get_prompt_config,
             save_custom_prompt,
