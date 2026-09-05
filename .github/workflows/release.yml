@@ -117,9 +117,108 @@ jobs:
           releaseDraft: false
           prerelease: false
 
+  build-android:
+    name: "Build Android APK"
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust Android Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Initialize Android Scaffolding
+        run: |
+          if [ ! -d "src-tauri/gen/android" ]; then
+            npx tauri android init
+          fi
+
+      - name: Build Android APK
+        run: npx tauri android build --apk
+
+      - name: Upload Android APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk_file=$(find src-tauri/gen/android -name "*.apk" 2>/dev/null | head -n 1)
+          if [ -n "$apk_file" ]; then
+            cp "$apk_file" "syntropyOS-${{ needs.release-please.outputs.tag_name }}-android.apk"
+            gh release upload "${{ needs.release-please.outputs.tag_name }}" "syntropyOS-${{ needs.release-please.outputs.tag_name }}-android.apk" --clobber
+          fi
+
+  build-ios:
+    name: "Build iOS App"
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust iOS Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Initialize iOS Scaffolding
+        run: |
+          if [ ! -d "src-tauri/gen/apple" ]; then
+            npx tauri ios init
+          fi
+
+      - name: Build iOS App (Unsigned)
+        run: npx tauri ios build -- --no-sign
+
+      - name: Package and Upload iOS Artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ios_bundle=$(find src-tauri/gen/apple -name "*.app" -o -name "*.ipa" -o -name "*.xcarchive" 2>/dev/null | head -n 1)
+          if [ -n "$ios_bundle" ]; then
+            tar czf "syntropyOS-${{ needs.release-please.outputs.tag_name }}-ios.tar.gz" -C "$(dirname "$ios_bundle")" "$(basename "$ios_bundle")"
+            gh release upload "${{ needs.release-please.outputs.tag_name }}" "syntropyOS-${{ needs.release-please.outputs.tag_name }}-ios.tar.gz" --clobber
+          fi
+
   checksums:
     name: "Generate SHA256SUMS"
-    needs: [release-please, build-release]
+    needs: [release-please, build-release, build-android, build-ios]
     runs-on: ubuntu-latest
     env:
       TAG: ${{ needs.release-please.outputs.tag_name }}
@@ -137,7 +236,7 @@ jobs:
 
   sync-lock:
     name: "Sync Locks on main after release"
-    needs: [release-please, build-release]
+    needs: [release-please, build-release, build-android, build-ios]
     if: ${{ needs.release-please.outputs.releases_created == 'true' }}
     runs-on: ubuntu-latest
     steps:

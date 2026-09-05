@@ -19,6 +19,7 @@ use syntropy_core::blackboard::BlackboardStore;
 use syntropy_engine::resilience::CircuitBreaker;
 use syntropy_engine::routing::ModelRouter;
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let paths = AppPaths::resolve().expect("Failed to resolve app paths");
     let _ = paths.ensure_directories();
