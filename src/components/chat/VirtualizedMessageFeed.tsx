@@ -51,36 +51,38 @@ export function VirtualizedMessageFeed({ messages }: VirtualizedMessageFeedProps
     <div
       ref={parentRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto px-4 py-3"
+      className="flex-1 overflow-y-auto"
       style={{ contain: "strict" }}
     >
-      <div
-        style={{
-          height: `${virtualizer.getTotalSize()}px`,
-          width: "100%",
-          position: "relative",
-        }}
-      >
-        {virtualizer.getVirtualItems().map((virtualItem) => {
-          const message = messages[virtualItem.index];
-          return (
-            <div
-              key={virtualItem.key}
-              ref={virtualizer.measureElement}
-              data-index={virtualItem.index}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-              className="pb-3"
-            >
-              <MessageItem message={message} />
-            </div>
-          );
-        })}
+      <div className="max-w-5xl mx-auto w-full px-3 sm:px-6 py-4">
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualItem) => {
+            const message = messages[virtualItem.index];
+            return (
+              <div
+                key={virtualItem.key}
+                ref={virtualizer.measureElement}
+                data-index={virtualItem.index}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+                className="pb-4"
+              >
+                <MessageItem message={message} />
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

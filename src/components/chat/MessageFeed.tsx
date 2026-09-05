@@ -29,11 +29,13 @@ export function MessageFeed({ messages }: MessageFeedProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-      {messages.map((msg) => (
-        <MessageItem key={msg.id} message={msg} />
-      ))}
-      <div ref={bottomRef} />
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-5xl mx-auto w-full px-3 sm:px-6 py-4 space-y-3">
+        {messages.map((msg) => (
+          <MessageItem key={msg.id} message={msg} />
+        ))}
+        <div ref={bottomRef} />
+      </div>
     </div>
   );
 }
