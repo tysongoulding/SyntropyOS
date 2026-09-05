@@ -1180,7 +1180,8 @@ Strict behavioral constraints:
 1. No Canned Greetings or Filler: NEVER start with greetings (e.g. "Hello! I am SyntropyOS AI"), conversational pleasantries, introductory capability summaries, checklists, or "How can I assist you today?". Start immediately with the solution or direct answer.
 2. Clean Markdown: Use GitHub Flavored Markdown for formatting. Wrap all code in triple-backtick language tags.
 3. Diagrams & Math: Use Mermaid diagrams, Markdown tables, or KaTeX math ONLY when specifically requested by the user or when directly indispensable to answer the query. NEVER output unprompted flowcharts, capability matrices, or entropy formulas on greetings or standard queries.
-4. No Placeholders: Write complete, functional, production-ready code."#;
+4. No Placeholders: Write complete, functional, production-ready code.
+5. Web Citations: When citing or referencing web search results or groundings, use inline numbered footnotes such as [1], [2], [3] directly after facts or claims (matching the numbered sources list). Do not create your own list of references at the end."#;
 
 #[tauri::command]
 pub async fn send_rpc_command(
@@ -1350,27 +1351,78 @@ pub async fn send_rpc_command(
                                     // Extract grounding metadata sources
                                     if let Some(grounding) = data["candidates"][0].get("groundingMetadata") {
                                         let mut sources = Vec::new();
+                                        let mut chunk_to_source_index = std::collections::HashMap::new();
                                         if let Some(chunks) = grounding.get("groundingChunks").and_then(|c| c.as_array()) {
-                                            for chunk in chunks {
+                                            for (chunk_idx, chunk) in chunks.iter().enumerate() {
                                                 if let Some(web) = chunk.get("web") {
                                                     let uri = web.get("uri").and_then(|u| u.as_str()).unwrap_or("");
                                                     let title = web.get("title").and_then(|t| t.as_str()).unwrap_or(uri);
-                                                    if !uri.is_empty() && !sources.iter().any(|(u, _)| u == uri) {
-                                                        sources.push((uri.to_string(), title.to_string()));
+                                                    if !uri.is_empty() {
+                                                        if let Some(existing_pos) = sources.iter().position(|(u, _)| u == uri) {
+                                                            chunk_to_source_index.insert(chunk_idx, existing_pos + 1);
+                                                        } else {
+                                                            sources.push((uri.to_string(), title.to_string()));
+                                                            chunk_to_source_index.insert(chunk_idx, sources.len());
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
+
+                                        // Inject inline footnotes [1], [2] from groundingSupports if Gemini did not include them
+                                        if !text.contains("[1]") && !sources.is_empty() {
+                                            if let Some(supports) = grounding.get("groundingSupports").and_then(|s| s.as_array()) {
+                                                let mut insertions: Vec<(usize, Vec<usize>)> = Vec::new();
+                                                for sup in supports {
+                                                    if let Some(chunk_indices) = sup.get("groundingChunkIndices").and_then(|i| i.as_array()) {
+                                                        let mut note_nums = Vec::new();
+                                                        for c_idx in chunk_indices {
+                                                            if let Some(ci) = c_idx.as_u64().map(|n| n as usize) {
+                                                                if let Some(&src_num) = chunk_to_source_index.get(&ci) {
+                                                                    if !note_nums.contains(&src_num) {
+                                                                        note_nums.push(src_num);
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        if !note_nums.is_empty() {
+                                                            note_nums.sort();
+                                                            let end_idx = sup.get("segment")
+                                                                .and_then(|seg| seg.get("endIndex"))
+                                                                .and_then(|e| e.as_u64())
+                                                                .unwrap_or(0) as usize;
+                                                            if end_idx > 0 {
+                                                                insertions.push((end_idx, note_nums));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                if !insertions.is_empty() {
+                                                    insertions.sort_by_key(|a| std::cmp::Reverse(a.0));
+                                                    let mut char_vec: Vec<char> = text.chars().collect();
+                                                    let len = char_vec.len();
+                                                    for (end_char_idx, note_nums) in insertions {
+                                                        let target_pos = end_char_idx.min(len);
+                                                        let notes_str = format!(" [{}]", note_nums.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(", "));
+                                                        let note_chars: Vec<char> = notes_str.chars().collect();
+                                                        char_vec.splice(target_pos..target_pos, note_chars);
+                                                    }
+                                                    text = char_vec.into_iter().collect();
+                                                }
+                                            }
+                                        }
+
                                         if !sources.is_empty() {
                                             text.push_str("\n\n---\n**🌐 Web Sources Consulted:**\n");
-                                            for (uri, title) in sources {
-                                                text.push_str(&format!("- [{}]({})\n", title, uri));
+                                            for (i, (uri, title)) in sources.iter().enumerate() {
+                                                text.push_str(&format!("{}. [{}]({})\n", i + 1, title, uri));
                                             }
                                         }
                                     } else if enable_web_search && !web_results.is_empty() {
                                         text.push_str("\n\n---\n**🌐 Web Sources Consulted:**\n");
-                                        for res in web_results.iter().take(4) {
-                                            text.push_str(&format!("- [{}]({})\n", res.title, res.url));
+                                        for (i, res) in web_results.iter().take(4).enumerate() {
+                                            text.push_str(&format!("{}. [{}]({})\n", i + 1, res.title, res.url));
                                         }
                                     }
 
@@ -1399,7 +1451,7 @@ pub async fn send_rpc_command(
                                             for (i, r) in web_results.iter().take(4).enumerate() {
                                                 ctx.push_str(&format!("{}. [{}]({})\n   {}\n\n", i + 1, r.title, r.url, r.snippet));
                                             }
-                                            ctx.push_str("Based on the live web search results above, answer the prompt directly and cite source URLs.\n\nUser Question: ");
+                                            ctx.push_str("Based on the live web search results above, answer the prompt directly and cite your sources inline using numbered footnotes [1], [2], [3] directly after claims (matching the numbered sources above). Do NOT create a sources list at the end.\n\nUser Question: ");
                                             ctx.push_str(clean_message);
                                             ctx
                                         } else {
@@ -1421,10 +1473,17 @@ pub async fn send_rpc_command(
                                         if let Ok(retry_resp) = client.post(&url).json(&fallback_body).send().await {
                                             if retry_resp.status().is_success() {
                                                 let retry_data: serde_json::Value = retry_resp.json().await.unwrap_or_default();
-                                                final_text = retry_data["candidates"][0]["content"]["parts"][0]["text"]
+                                                let mut text = retry_data["candidates"][0]["content"]["parts"][0]["text"]
                                                     .as_str()
                                                     .unwrap_or("No response generated.")
                                                     .to_string();
+                                                if enable_web_search && !web_results.is_empty() && !text.contains("🌐 Web Sources Consulted") {
+                                                    text.push_str("\n\n---\n**🌐 Web Sources Consulted:**\n");
+                                                    for (i, res) in web_results.iter().take(4).enumerate() {
+                                                        text.push_str(&format!("{}. [{}]({})\n", i + 1, res.title, res.url));
+                                                    }
+                                                }
+                                                final_text = text;
                                                 break;
                                             }
                                         }
@@ -1465,7 +1524,7 @@ pub async fn send_rpc_command(
                         for (i, r) in web_results.iter().take(5).enumerate() {
                             ctx.push_str(&format!("{}. [{}]({})\n   {}\n\n", i + 1, r.title, r.url, r.snippet));
                         }
-                        ctx.push_str("Based on the live web search results above, answer the prompt directly and cite the source URLs as markdown links.\n\nUser Question: ");
+                        ctx.push_str("Based on the live web search results above, answer the prompt directly and cite your sources inline using numbered footnotes [1], [2], [3] directly after claims (matching the numbered sources above). Do NOT create a sources list at the end.\n\nUser Question: ");
                         ctx.push_str(clean_message);
                         ctx
                     } else {
@@ -1491,7 +1550,7 @@ pub async fn send_rpc_command(
                             let status = resp.status();
                             if status.is_success() {
                                 let data: serde_json::Value = resp.json().await.unwrap_or_default();
-                                let text = data["choices"][0]["message"]["content"]
+                                let mut text = data["choices"][0]["message"]["content"]
                                     .as_str()
                                     .unwrap_or("No response generated.")
                                     .to_string();
@@ -1499,6 +1558,12 @@ pub async fn send_rpc_command(
                                     .as_str()
                                     .unwrap_or("")
                                     .to_string();
+                                if enable_web_search && !web_results.is_empty() && !text.contains("🌐 Web Sources Consulted") {
+                                    text.push_str("\n\n---\n**🌐 Web Sources Consulted:**\n");
+                                    for (i, res) in web_results.iter().take(5).enumerate() {
+                                        text.push_str(&format!("{}. [{}]({})\n", i + 1, res.title, res.url));
+                                    }
+                                }
                                 (text, reasoning)
                             } else {
                                 let err_body = resp.text().await.unwrap_or_default();
@@ -1519,7 +1584,7 @@ pub async fn send_rpc_command(
                         for (i, r) in web_results.iter().take(5).enumerate() {
                             ctx.push_str(&format!("{}. [{}]({})\n   {}\n\n", i + 1, r.title, r.url, r.snippet));
                         }
-                        ctx.push_str("Based on the live web search results above, answer the prompt directly and cite the source URLs as markdown links.\n\nUser Question: ");
+                        ctx.push_str("Based on the live web search results above, answer the prompt directly and cite your sources inline using numbered footnotes [1], [2], [3] directly after claims (matching the numbered sources above). Do NOT create a sources list at the end.\n\nUser Question: ");
                         ctx.push_str(clean_message);
                         ctx
                     } else {
@@ -1558,6 +1623,12 @@ pub async fn send_rpc_command(
                                                 reasoning.push_str(th);
                                             }
                                         }
+                                    }
+                                }
+                                if enable_web_search && !web_results.is_empty() && !text.contains("🌐 Web Sources Consulted") {
+                                    text.push_str("\n\n---\n**🌐 Web Sources Consulted:**\n");
+                                    for (i, res) in web_results.iter().take(5).enumerate() {
+                                        text.push_str(&format!("{}. [{}]({})\n", i + 1, res.title, res.url));
                                     }
                                 }
                                 (text, reasoning)

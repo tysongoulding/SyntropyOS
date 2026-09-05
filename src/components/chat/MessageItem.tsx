@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { MessageItem as MessageItemType } from "../../store/sessionStore";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolActionCard } from "../cards/ToolActionCard";
@@ -19,6 +19,179 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useToastStore } from "../../store/toastStore";
+import { invoke } from "@tauri-apps/api/core";
+
+interface WebSource {
+  index: number;
+  title: string;
+  url: string;
+}
+
+function parseWebSources(content: string): Map<number, WebSource> {
+  const map = new Map<number, WebSource>();
+  const numberedRegex = /(?:^|\n)\s*(\d+)\.\s*(?:\*\*)?\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)(?:\*\*)?/g;
+  let match;
+  while ((match = numberedRegex.exec(content)) !== null) {
+    const idx = parseInt(match[1], 10);
+    map.set(idx, {
+      index: idx,
+      title: match[2].trim(),
+      url: match[3].trim(),
+    });
+  }
+
+  if (map.size === 0) {
+    const bulletRegex = /(?:^|\n)\s*[-*]\s*(?:\*\*)?\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)(?:\*\*)?/g;
+    let bulletIdx = 1;
+    while ((match = bulletRegex.exec(content)) !== null) {
+      map.set(bulletIdx, {
+        index: bulletIdx,
+        title: match[1].trim(),
+        url: match[2].trim(),
+      });
+      bulletIdx++;
+    }
+  }
+  return map;
+}
+
+function preprocessCitations(text: string): string {
+  const codeRegex = /(```[\s\S]*?```|`[^`\n]+`)/g;
+  const parts = text.split(codeRegex);
+
+  return parts
+    .map((part, i) => {
+      if (i % 2 === 1) {
+        return part;
+      }
+      return part.replace(/\[(\d+(?:\s*,\s*\d+)*)\](?!\()/g, (_match, group) => {
+        const nums = group
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        return nums.map((n: string) => `[${n}](syntropy-cite:${n})`).join(" ");
+      });
+    })
+    .join("");
+}
+
+function cleanDisplayUrl(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    const domain = u.hostname.replace(/^www\./, "");
+    const path = u.pathname.length > 24 ? u.pathname.substring(0, 24) + "…" : u.pathname;
+    return domain + (path !== "/" ? path : "");
+  } catch {
+    return rawUrl.length > 32 ? rawUrl.substring(0, 32) + "…" : rawUrl;
+  }
+}
+
+function extractCitationNumber(children: React.ReactNode, href?: string): number | null {
+  if (href?.startsWith("syntropy-cite:")) {
+    const parsed = parseInt(href.replace("syntropy-cite:", ""), 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  const getText = (node: React.ReactNode): string => {
+    if (typeof node === "string" || typeof node === "number") return String(node);
+    if (Array.isArray(node)) return node.map(getText).join("");
+    if (React.isValidElement(node) && node.props && typeof node.props === "object") {
+      const props = node.props as { children?: React.ReactNode };
+      return getText(props.children);
+    }
+    return "";
+  };
+  const text = getText(children).trim();
+  const match = /^\[?(\d+)\]?$/.exec(text);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return null;
+}
+
+interface FootnoteBadgeProps {
+  number: number;
+  url?: string;
+  title?: string;
+  onOpenUrl: (url: string) => void;
+}
+
+function FootnoteBadge({ number, url, title, onOpenUrl }: FootnoteBadgeProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    timerRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 180);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (url) {
+      onOpenUrl(url);
+    }
+  };
+
+  return (
+    <span
+      className="relative inline-block align-baseline mx-0.5"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button
+        type="button"
+        onClick={handleClick}
+        className="inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-mono font-semibold bg-[#161b22] text-[#58a6ff] border border-[#388bfd]/30 hover:bg-[#1f6feb] hover:text-white hover:border-[#58a6ff] transition-all shadow-xs cursor-pointer select-none -translate-y-0.5"
+        title={title || url || `Source [${number}]`}
+        aria-label={`Source citation ${number}`}
+      >
+        {number}
+      </button>
+
+      {isHovered && (
+        <div
+          onClick={handleClick}
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 max-w-xs p-2.5 rounded-lg bg-[#161b22] border border-[#30363d] shadow-2xl z-50 text-left pointer-events-auto backdrop-blur-md cursor-pointer hover:border-[#58a6ff]/60 transition-colors"
+        >
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="flex items-center space-x-1.5 min-w-0">
+              <span className="flex items-center justify-center min-w-[15px] h-[15px] px-0.5 rounded-full bg-[#58a6ff]/20 text-[#58a6ff] text-[9px] font-mono font-bold shrink-0">
+                {number}
+              </span>
+              <span className="text-[11px] font-medium text-white truncate leading-tight">
+                {title || `Source [${number}]`}
+              </span>
+            </div>
+            <ExternalLink className="w-3 h-3 text-[#58a6ff] shrink-0 mt-0.5" />
+          </div>
+
+          {url && (
+            <div className="text-[10px] text-[#8b949e] hover:text-[#58a6ff] truncate mt-1 font-mono transition-colors">
+              {cleanDisplayUrl(url)}
+            </div>
+          )}
+
+          <div className="mt-2 pt-1.5 border-t border-[#30363d]/60 flex items-center justify-between text-[10px]">
+            <span className="text-[9px] text-[#8b949e]">Click to open in browser</span>
+            <span className="text-[#58a6ff] font-medium flex items-center space-x-0.5">
+              <span>Visit</span>
+              <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
+            </span>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
 
 interface MessageItemProps {
   message: MessageItemType;
@@ -92,6 +265,22 @@ function renderAlertCallout(text: string) {
 export const MessageItem = React.memo(function MessageItem({ message }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const { addToast } = useToastStore();
+
+  const sourcesMap = useMemo(() => {
+    return parseWebSources(message.content || "");
+  }, [message.content]);
+
+  const processedContent = useMemo(() => {
+    if (!message.content) return "";
+    return preprocessCitations(message.content);
+  }, [message.content]);
+
+  const handleOpenUrl = (url?: string) => {
+    if (!url) return;
+    invoke("open_external_url", { url }).catch(() => {
+      window.open(url, "_blank");
+    });
+  };
 
   const handleCopy = async () => {
     try {
@@ -230,15 +419,35 @@ export const MessageItem = React.memo(function MessageItem({ message }: MessageI
                 return <tr className="hover:bg-[#161b22]/30 transition-colors">{children}</tr>;
               },
               a({ href, children }) {
+                const citationNum = extractCitationNumber(children, href);
+                if (citationNum !== null) {
+                  const source = sourcesMap.get(citationNum);
+                  const targetUrl = source?.url || (href && !href.startsWith("syntropy-cite:") ? href : undefined);
+                  const targetTitle = source?.title;
+                  return (
+                    <FootnoteBadge
+                      number={citationNum}
+                      url={targetUrl}
+                      title={targetTitle}
+                      onOpenUrl={handleOpenUrl}
+                    />
+                  );
+                }
+
                 return (
                   <a
                     href={href}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleOpenUrl(href);
+                    }}
+                    title={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#58a6ff] hover:text-[#79c0ff] underline inline-flex items-center space-x-0.5"
+                    className="text-[#58a6ff] hover:text-[#79c0ff] underline inline-flex items-center space-x-0.5 cursor-pointer font-medium"
                   >
                     <span>{children}</span>
-                    <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                    <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-70 shrink-0" />
                   </a>
                 );
               },
@@ -246,7 +455,7 @@ export const MessageItem = React.memo(function MessageItem({ message }: MessageI
                 return <ul className="list-disc pl-5 my-2 space-y-1 text-[#c9d1d9]">{children}</ul>;
               },
               ol({ children }) {
-                return <ol className="list-decimal pl-5 my-2 space-y-1 text-[#c9d1d9]">{children}</ol>;
+                return <ol className="list-decimal pl-5 my-2 space-y-1.5 text-[#c9d1d9]">{children}</ol>;
               },
               li({ children }) {
                 return <li className="leading-relaxed">{children}</li>;
@@ -292,7 +501,7 @@ export const MessageItem = React.memo(function MessageItem({ message }: MessageI
               },
             }}
           >
-            {message.content}
+            {processedContent}
           </Markdown>
         </div>
       ) : isGenerating ? (
