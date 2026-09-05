@@ -596,6 +596,23 @@ pub async fn save_lota_settings(
     Ok(())
 }
 
+const MARKDOWN_SYSTEM_INSTRUCTION: &str = r#"You are SyntropyOS AI, an expert autonomous engineering assistant.
+You must ALWAYS format your entire response using rich, clean GitHub Flavored Markdown (GFM).
+
+Strict formatting directives:
+1. Universal Markdown: Format all output with structured headings (#, ##, ###), clear paragraph breaks, bullet lists, and bold/italic emphasis. Never return unstructured raw text.
+2. Code Blocks: Wrap all code, commands, logs, and configuration files in triple-backtick fenced blocks with explicit language tags (e.g. ```rust, ```typescript, ```python, ```bash, ```json, ```yaml, ```html, ```css, etc.).
+3. Diagrams (Mermaid): Whenever explaining workflows, system architectures, state transitions, sequence flows, data lifecycles, or dependency graphs, ALWAYS create visual diagrams using ```mermaid fenced code blocks (flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gitGraph).
+4. Mathematics & Formulas (KaTeX): Render mathematical, statistical, algorithmic complexity, or scientific formulas using LaTeX syntax ($...$ for inline math and $$...$$ for display equations).
+5. Tables: Format structured comparisons, specifications, matrices, or schemas using Markdown tables with headers (| Column | Header |).
+6. Alerts & Callouts: Use GitHub Flavored Markdown callout syntax for important highlights:
+   > [!NOTE]
+   > [!TIP]
+   > [!IMPORTANT]
+   > [!WARNING]
+   > [!CAUTION]
+7. Checklists: Use `- [ ]` and `- [x]` for tasks, milestones, or verification criteria."#;
+
 #[tauri::command]
 pub async fn send_rpc_command(
     app: AppHandle,
@@ -622,6 +639,12 @@ pub async fn send_rpc_command(
                 "xai" => "grok-2-1212",
                 _ => "gemini-2.5-flash",
             });
+        let custom_preamble = request.get("preamble").and_then(|v| v.as_str()).unwrap_or("");
+        let effective_system_prompt = if custom_preamble.trim().is_empty() {
+            MARKDOWN_SYSTEM_INSTRUCTION.to_string()
+        } else {
+            format!("{}\n\n---\n\n{}", custom_preamble.trim(), MARKDOWN_SYSTEM_INSTRUCTION)
+        };
         let ws_id = format!("ws-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
 
         // 1. Emit turn_start
@@ -650,6 +673,9 @@ pub async fn send_rpc_command(
                         key.as_str()
                     );
                     let body = serde_json::json!({
+                        "systemInstruction": {
+                            "parts": [{ "text": effective_system_prompt }]
+                        },
                         "contents": [
                             {
                                 "role": "user",
@@ -688,7 +714,10 @@ pub async fn send_rpc_command(
                     };
                     let body = serde_json::json!({
                         "model": requested_model,
-                        "messages": [{ "role": "user", "content": message }]
+                        "messages": [
+                            { "role": "system", "content": effective_system_prompt },
+                            { "role": "user", "content": message }
+                        ]
                     });
 
                     match client
@@ -728,6 +757,7 @@ pub async fn send_rpc_command(
                     let body = serde_json::json!({
                         "model": requested_model,
                         "max_tokens": 4096,
+                        "system": effective_system_prompt,
                         "messages": [{ "role": "user", "content": message }]
                     });
 
@@ -779,7 +809,8 @@ pub async fn send_rpc_command(
         } else {
             (
                 format!(
-                    "⚠️ No credentials configured for {} in Keystore.\n\nPlease open Settings -> Cloud Providers & API Keys and configure your {} API key or OAuth session to activate live inference.\n\n(Local echo: \"{}\")",
+                    "### ⚠️ {} Setup Required\n\nNo credentials configured for **{}** in the hardware Keystore.\n\n> [!TIP]\n> Navigate to **Settings -> Cloud Providers & API Keys** to configure your {} API key or OAuth session to activate live inference.\n\n```text\n(Local Echo: {})\n```",
+                    requested_provider.to_uppercase(),
                     requested_provider.to_uppercase(),
                     requested_provider,
                     message

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { highlightCode } from "../../lib/highlighter";
 import { Copy, Check, Terminal } from "lucide-react";
+import { MermaidViewer } from "../diagrams/MermaidViewer";
 
 interface CodeBlockProps {
   code: string;
@@ -9,6 +10,10 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ code, language = "text", inline = false }: CodeBlockProps) {
+  if (!inline && language.toLowerCase() === "mermaid") {
+    return <MermaidViewer code={code} />;
+  }
+
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [copied, setCopied] = useState(false);
 

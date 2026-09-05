@@ -17,8 +17,9 @@ export function useRhoEngine() {
   }, []);
 
   const prompt = useCallback((message: string) => {
-    const { activeModel, activeProviderId } = useProviderStore.getState();
-    return rhoClient.prompt(message, activeModel, activeProviderId);
+    const { activeModel, activeProviderId, preambles, activePreambleId } = useProviderStore.getState();
+    const activePreamble = preambles?.find((p) => p.id === activePreambleId);
+    return rhoClient.prompt(message, activeModel, activeProviderId, activePreamble?.content);
   }, []);
 
   const steer = useCallback((message: string) => {

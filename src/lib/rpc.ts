@@ -70,13 +70,14 @@ export class RhoClient {
     };
   }
 
-  public prompt(message: string, model?: string, provider?: string) {
+  public prompt(message: string, model?: string, provider?: string, preamble?: string) {
     return this.sendCommand({
       type: "prompt",
       message,
       ...(model ? { model } : {}),
       ...(provider ? { provider } : {}),
-    } as RpcCommand);
+      ...(preamble ? { preamble } : {}),
+    });
   }
 
   public steer(message: string) {

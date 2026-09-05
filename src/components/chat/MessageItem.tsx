@@ -1,17 +1,92 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { MessageItem as MessageItemType } from "../../store/sessionStore";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolActionCard } from "../cards/ToolActionCard";
 import { CodeBlock } from "./CodeBlock";
+import { MermaidViewer } from "../diagrams/MermaidViewer";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { Copy, Check } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Info,
+  Lightbulb,
+  AlertTriangle,
+  Flame,
+  ShieldAlert,
+  ExternalLink,
+} from "lucide-react";
 import { useToastStore } from "../../store/toastStore";
 
 interface MessageItemProps {
   message: MessageItemType;
+}
+
+// GitHub Callout / Alert parser
+function renderAlertCallout(text: string) {
+  const noteMatch = text.match(/^\[!NOTE\]\s*([\s\S]*)/i);
+  if (noteMatch) {
+    return {
+      type: "note",
+      title: "Note",
+      icon: Info,
+      color: "border-blue-500 bg-blue-950/25 text-blue-200",
+      iconColor: "text-blue-400",
+      body: noteMatch[1],
+    };
+  }
+
+  const tipMatch = text.match(/^\[!TIP\]\s*([\s\S]*)/i);
+  if (tipMatch) {
+    return {
+      type: "tip",
+      title: "Tip",
+      icon: Lightbulb,
+      color: "border-emerald-500 bg-emerald-950/25 text-emerald-200",
+      iconColor: "text-emerald-400",
+      body: tipMatch[1],
+    };
+  }
+
+  const impMatch = text.match(/^\[!IMPORTANT\]\s*([\s\S]*)/i);
+  if (impMatch) {
+    return {
+      type: "important",
+      title: "Important",
+      icon: Flame,
+      color: "border-purple-500 bg-purple-950/25 text-purple-200",
+      iconColor: "text-purple-400",
+      body: impMatch[1],
+    };
+  }
+
+  const warnMatch = text.match(/^\[!WARNING\]\s*([\s\S]*)/i);
+  if (warnMatch) {
+    return {
+      type: "warning",
+      title: "Warning",
+      icon: AlertTriangle,
+      color: "border-amber-500 bg-amber-950/25 text-amber-200",
+      iconColor: "text-amber-400",
+      body: warnMatch[1],
+    };
+  }
+
+  const cautionMatch = text.match(/^\[!CAUTION\]\s*([\s\S]*)/i);
+  if (cautionMatch) {
+    return {
+      type: "caution",
+      title: "Caution",
+      icon: ShieldAlert,
+      color: "border-red-500 bg-red-950/25 text-red-200",
+      iconColor: "text-red-400",
+      body: cautionMatch[1],
+    };
+  }
+
+  return null;
 }
 
 export function MessageItem({ message }: MessageItemProps) {
@@ -80,14 +155,138 @@ export function MessageItem({ message }: MessageItemProps) {
             remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[rehypeKatex]}
             components={{
+              h1({ children }) {
+                return (
+                  <h1 className="text-lg font-bold text-white border-b border-[#30363d] pb-1.5 mt-5 mb-2.5 flex items-center space-x-2">
+                    <span>{children}</span>
+                  </h1>
+                );
+              },
+              h2({ children }) {
+                return (
+                  <h2 className="text-base font-semibold text-white border-b border-[#30363d]/60 pb-1 mt-4 mb-2">
+                    {children}
+                  </h2>
+                );
+              },
+              h3({ children }) {
+                return <h3 className="text-sm font-semibold text-[#58a6ff] mt-3.5 mb-1.5">{children}</h3>;
+              },
+              h4({ children }) {
+                return <h4 className="text-xs font-semibold text-purple-300 mt-2.5 mb-1 uppercase tracking-wider">{children}</h4>;
+              },
+              blockquote({ children }) {
+                const extractText = (node: React.ReactNode): string => {
+                  if (typeof node === "string" || typeof node === "number") return String(node);
+                  if (Array.isArray(node)) return node.map(extractText).join("");
+                  if (React.isValidElement(node) && node.props && typeof node.props === "object") {
+                    const props = node.props as { children?: React.ReactNode };
+                    return extractText(props.children);
+                  }
+                  return "";
+                };
+
+                const rawText = extractText(children);
+                const alert = renderAlertCallout(rawText);
+                if (alert) {
+                  const Icon = alert.icon;
+                  return (
+                    <div className={`my-3 p-3 rounded-xl border-l-4 ${alert.color} shadow-xs space-y-1 select-text`}>
+                      <div className="flex items-center space-x-2 font-semibold text-xs uppercase tracking-wide">
+                        <Icon className={`w-3.5 h-3.5 ${alert.iconColor}`} />
+                        <span>{alert.title}</span>
+                      </div>
+                      <div className="text-xs pl-5 text-[#c9d1d9] leading-relaxed">{alert.body}</div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <blockquote className="border-l-2 border-[#58a6ff]/70 bg-[#161b22]/40 pl-3 py-1.5 rounded-r my-2.5 text-[#8b949e] italic text-xs">
+                    {children}
+                  </blockquote>
+                );
+              },
+              table({ children }) {
+                return (
+                  <div className="my-3 overflow-x-auto rounded-lg border border-[#30363d] bg-[#0d1117] select-text">
+                    <table className="w-full text-left border-collapse text-xs">{children}</table>
+                  </div>
+                );
+              },
+              thead({ children }) {
+                return <thead className="bg-[#161b22] text-white border-b border-[#30363d]">{children}</thead>;
+              },
+              tbody({ children }) {
+                return <tbody className="divide-y divide-[#30363d]/50 bg-[#0d1117]">{children}</tbody>;
+              },
+              th({ children }) {
+                return <th className="p-2.5 font-semibold text-[#8b949e] uppercase text-[10px] tracking-wider">{children}</th>;
+              },
+              td({ children }) {
+                return <td className="p-2.5 text-[#c9d1d9]">{children}</td>;
+              },
+              tr({ children }) {
+                return <tr className="hover:bg-[#161b22]/30 transition-colors">{children}</tr>;
+              },
+              a({ href, children }) {
+                return (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#58a6ff] hover:text-[#79c0ff] underline inline-flex items-center space-x-0.5"
+                  >
+                    <span>{children}</span>
+                    <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                  </a>
+                );
+              },
+              ul({ children }) {
+                return <ul className="list-disc pl-5 my-2 space-y-1 text-[#c9d1d9]">{children}</ul>;
+              },
+              ol({ children }) {
+                return <ol className="list-decimal pl-5 my-2 space-y-1 text-[#c9d1d9]">{children}</ol>;
+              },
+              li({ children }) {
+                return <li className="leading-relaxed">{children}</li>;
+              },
+              input({ type, checked, disabled }) {
+                if (type === "checkbox") {
+                  return (
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={disabled}
+                      readOnly
+                      className="rounded border-[#30363d] bg-[#161b22] text-[#58a6ff] focus:ring-0 mr-2 align-middle cursor-default"
+                    />
+                  );
+                }
+                return <input type={type} />;
+              },
+              hr() {
+                return <hr className="my-4 border-[#30363d]" />;
+              },
               code({ className, children }) {
                 const match = /language-(\w+)/.exec(className || "");
+                const lang = match ? match[1].toLowerCase() : "text";
                 const isInline = !match && !String(children).includes("\n");
+                const codeString = String(children).replace(/\n$/, "");
+
+                if (!isInline && lang === "mermaid") {
+                  return (
+                    <div className="my-3 w-full">
+                      <MermaidViewer code={codeString} />
+                    </div>
+                  );
+                }
+
                 return (
                   <CodeBlock
                     inline={isInline}
-                    language={match ? match[1] : "text"}
-                    code={String(children).replace(/\n$/, "")}
+                    language={lang}
+                    code={codeString}
                   />
                 );
               },

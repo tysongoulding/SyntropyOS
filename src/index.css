@@ -262,3 +262,15 @@ html.light textarea::placeholder {
   font-weight: 600;
 }
 
+.markdown-content ul.contains-task-list {
+  list-style-type: none;
+  padding-left: 0.25rem;
+}
+
+.markdown-content li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 0.35rem;
+}
+
+
