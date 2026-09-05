@@ -33,7 +33,7 @@ export function App() {
   const { messages, isRunning, addUserMessage } = useSessionStore();
   const { activeView, statusbarOpen } = useUiStore();
   const { subagents, activeChatAgentId } = useSubagentStore();
-  const { syncKeysToBackend, loadKeysFromSharedAuthFile } = useProviderStore();
+  const { syncKeysToBackend, loadKeysFromSharedAuthFile, loadCachedModelsFromBackend, fetchAllProviderModels } = useProviderStore();
   const { mode } = useThemeStore();
   const { prompt } = useRhoEngine();
   const { queue, dequeue } = useTurnQueue();
@@ -44,10 +44,16 @@ export function App() {
     import("./lib/settingsSync").then(({ loadSettingsFromDisk }) => {
       loadSettingsFromDisk();
     });
+    // Immediately load cached models from persistent disk cache
+    loadCachedModelsFromBackend().catch(() => {});
+
+    // Sync auth keys and refresh all provider models from API endpoints
     loadKeysFromSharedAuthFile().then(() => {
-      syncKeysToBackend();
+      syncKeysToBackend().then(() => {
+        fetchAllProviderModels().catch(() => {});
+      });
     });
-  }, [loadKeysFromSharedAuthFile, syncKeysToBackend]);
+  }, [loadKeysFromSharedAuthFile, syncKeysToBackend, loadCachedModelsFromBackend, fetchAllProviderModels]);
 
   useGlobalShortcuts();
   const { isDragging } = useDragAndDrop();

@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State, Window};
@@ -12,7 +13,6 @@ use syntropy_core::blueprints::sprint::OneHourSprintBlueprint;
 use syntropy_engine::resilience::CircuitBreaker;
 use syntropy_engine::routing::ModelRouter;
 use tokio::sync::RwLock;
-
 pub struct AppState {
     pub paths: AppPaths,
     pub keystore: SecureKeystore,
@@ -86,6 +86,85 @@ pub async fn get_saved_auth_keys(
     Ok(map)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedProviderModels {
+    pub provider: String,
+    pub models: Vec<String>,
+    pub cached_at: u64,
+}
+
+pub fn get_models_cache_path(app_data_dir: &std::path::Path) -> std::path::PathBuf {
+    app_data_dir.join("models_cache.json")
+}
+
+pub async fn save_provider_models_to_cache(
+    app_data_dir: &std::path::Path,
+    provider: &str,
+    models: &[String],
+) {
+    if models.is_empty() {
+        return;
+    }
+    let cache_path = get_models_cache_path(app_data_dir);
+    let mut cache_map: HashMap<String, CachedProviderModels> = if cache_path.exists() {
+        match tokio::fs::read_to_string(&cache_path).await {
+            Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+            Err(_) => HashMap::new(),
+        }
+    } else {
+        HashMap::new()
+    };
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    cache_map.insert(
+        provider.to_string(),
+        CachedProviderModels {
+            provider: provider.to_string(),
+            models: models.to_vec(),
+            cached_at: now,
+        },
+    );
+
+    if let Ok(serialized) = serde_json::to_string_pretty(&cache_map) {
+        let _ = tokio::fs::write(&cache_path, serialized).await;
+    }
+}
+
+pub async fn read_provider_models_from_cache(
+    app_data_dir: &std::path::Path,
+    provider: &str,
+) -> Option<Vec<String>> {
+    let cache_path = get_models_cache_path(app_data_dir);
+    if !cache_path.exists() {
+        return None;
+    }
+    let content = tokio::fs::read_to_string(&cache_path).await.ok()?;
+    let cache_map: HashMap<String, CachedProviderModels> = serde_json::from_str(&content).ok()?;
+    cache_map.get(provider).map(|entry| entry.models.clone())
+}
+
+pub async fn read_all_models_from_cache(
+    app_data_dir: &std::path::Path,
+) -> HashMap<String, Vec<String>> {
+    let cache_path = get_models_cache_path(app_data_dir);
+    let mut res = HashMap::new();
+    if !cache_path.exists() {
+        return res;
+    }
+    if let Ok(content) = tokio::fs::read_to_string(&cache_path).await {
+        if let Ok(cache_map) = serde_json::from_str::<HashMap<String, CachedProviderModels>>(&content) {
+            for (p, entry) in cache_map {
+                res.insert(p, entry.models);
+            }
+        }
+    }
+    res
+}
+
 fn is_deprecated_gemini_model(model: &str) -> bool {
     let m = model.to_lowercase();
     m.contains("2.5-pro")
@@ -93,6 +172,8 @@ fn is_deprecated_gemini_model(model: &str) -> bool {
         || m.contains("bison")
         || m.contains("aqa")
         || m.contains("embedding")
+        || m.contains("text-")
+        || m.contains("imagen")
         || m == "gemini-pro"
         || m == "gemini-pro-vision"
 }
@@ -103,6 +184,7 @@ pub async fn test_provider_key(
     key: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<TestKeyResponse, String> {
+    let is_ollama = provider == "ollama";
     let resolved_key = if let Some(k) = key.filter(|k| !k.trim().is_empty()) {
         Some(k)
     } else {
@@ -110,7 +192,18 @@ pub async fn test_provider_key(
     };
 
     let clean_key = resolved_key.as_deref().unwrap_or("").trim();
-    if clean_key.is_empty() {
+    if clean_key.is_empty() && !is_ollama {
+        // Fallback to cached models if available when key is empty
+        if let Some(cached) = read_provider_models_from_cache(&state.paths.app_data_dir, &provider).await {
+            if !cached.is_empty() {
+                return Ok(TestKeyResponse {
+                    success: false,
+                    latency_ms: 0,
+                    message: format!("No active API key, but {} cached models found for {}", cached.len(), provider),
+                    models: cached,
+                });
+            }
+        }
         return Ok(TestKeyResponse {
             success: false,
             latency_ms: 0,
@@ -177,6 +270,23 @@ pub async fn test_provider_key(
                             ];
                         }
 
+                        // Sort models prioritizing latest generation
+                        models.sort_by(|a, b| {
+                            let score = |name: &str| -> i32 {
+                                if name.starts_with("gemini-2.5-flash") { 100 }
+                                else if name.starts_with("gemini-3.1-pro") { 90 }
+                                else if name.starts_with("gemini-2.0-flash") { 80 }
+                                else if name.starts_with("gemini-2.0") { 70 }
+                                else if name.starts_with("gemini-1.5-flash") { 60 }
+                                else if name.starts_with("gemini-1.5-pro") { 50 }
+                                else { 10 }
+                            };
+                            score(b).cmp(&score(a))
+                        });
+
+                        // Cache live discovered models to disk
+                        save_provider_models_to_cache(&state.paths.app_data_dir, "gemini", &models).await;
+
                         // Live probe to verify model generation actually succeeds
                         let mut verified_working_model = String::new();
                         for candidate in models.iter().take(3) {
@@ -197,9 +307,9 @@ pub async fn test_provider_key(
                         }
 
                         let message = if !verified_working_model.is_empty() {
-                            format!("Google Gemini Verified & Active (Tested generateContent on {}, {} models available)", verified_working_model, models.len())
+                            format!("Google Gemini Verified & Active (Tested generateContent on {}, {} models cached)", verified_working_model, models.len())
                         } else {
-                            format!("Google Gemini Verified ({}, {} models discovered)", status.as_u16(), models.len())
+                            format!("Google Gemini Verified ({}, {} models discovered & cached)", status.as_u16(), models.len())
                         };
 
                         Ok(TestKeyResponse {
@@ -214,20 +324,32 @@ pub async fn test_provider_key(
                             .ok()
                             .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "gemini").await.unwrap_or_default();
                         Ok(TestKeyResponse {
-                            success: false,
+                            success: !cached.is_empty(),
                             latency_ms: latency,
-                            message: error_msg,
-                            models: Vec::new(),
+                            message: if !cached.is_empty() {
+                                format!("{} (Loaded {} cached models)", error_msg, cached.len())
+                            } else {
+                                error_msg
+                            },
+                            models: cached,
                         })
                     }
                 }
-                Err(err) => Ok(TestKeyResponse {
-                    success: false,
-                    latency_ms: start.elapsed().as_millis() as u64,
-                    message: err.to_string(),
-                    models: Vec::new(),
-                }),
+                Err(err) => {
+                    let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "gemini").await.unwrap_or_default();
+                    Ok(TestKeyResponse {
+                        success: !cached.is_empty(),
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: if !cached.is_empty() {
+                            format!("{} (Loaded {} cached models)", err, cached.len())
+                        } else {
+                            err.to_string()
+                        },
+                        models: cached,
+                    })
+                }
             }
         }
         "anthropic" => {
@@ -263,10 +385,21 @@ pub async fn test_provider_key(
                                 "claude-3-5-haiku-20241022".to_string(),
                             ];
                         }
+                        models.sort_by(|a, b| {
+                            let score = |name: &str| -> i32 {
+                                if name.contains("3-7-sonnet") { 100 }
+                                else if name.contains("3-5-sonnet") { 90 }
+                                else if name.contains("3-5-haiku") { 80 }
+                                else if name.contains("3-opus") { 70 }
+                                else { 10 }
+                            };
+                            score(b).cmp(&score(a))
+                        });
+                        save_provider_models_to_cache(&state.paths.app_data_dir, "anthropic", &models).await;
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("Anthropic Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            message: format!("Anthropic Verified ({}, {} models cached)", status.as_u16(), models.len()),
                             models,
                         })
                     } else {
@@ -275,20 +408,32 @@ pub async fn test_provider_key(
                             .ok()
                             .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "anthropic").await.unwrap_or_default();
                         Ok(TestKeyResponse {
-                            success: false,
+                            success: !cached.is_empty(),
                             latency_ms: latency,
-                            message: error_msg,
-                            models: Vec::new(),
+                            message: if !cached.is_empty() {
+                                format!("{} (Loaded {} cached models)", error_msg, cached.len())
+                            } else {
+                                error_msg
+                            },
+                            models: cached,
                         })
                     }
                 }
-                Err(err) => Ok(TestKeyResponse {
-                    success: false,
-                    latency_ms: start.elapsed().as_millis() as u64,
-                    message: err.to_string(),
-                    models: Vec::new(),
-                }),
+                Err(err) => {
+                    let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "anthropic").await.unwrap_or_default();
+                    Ok(TestKeyResponse {
+                        success: !cached.is_empty(),
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: if !cached.is_empty() {
+                            format!("{} (Loaded {} cached models)", err, cached.len())
+                        } else {
+                            err.to_string()
+                        },
+                        models: cached,
+                    })
+                }
             }
         }
         "openai" => {
@@ -309,20 +454,27 @@ pub async fn test_provider_key(
                             if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
                                 for item in arr {
                                     if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
-                                        if (id.starts_with("gpt-") || id.starts_with("o1") || id.starts_with("o3") || id.starts_with("chatgpt-"))
-                                            && !id.contains("audio")
-                                            && !id.contains("realtime")
-                                            && !id.contains("embedding")
-                                            && !id.contains("tts")
-                                            && !id.contains("whisper")
-                                        {
+                                        let m = id.to_lowercase();
+                                        let is_chat = m.starts_with("gpt-") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("chatgpt-");
+                                        let is_unusable = m.contains("audio")
+                                            || m.contains("realtime")
+                                            || m.contains("embedding")
+                                            || m.contains("tts")
+                                            || m.contains("whisper")
+                                            || m.contains("dall-e")
+                                            || m.contains("moderation")
+                                            || m.contains("davinci")
+                                            || m.contains("babbage")
+                                            || m.contains("instruct")
+                                            || m.contains("search")
+                                            || m.contains("similarity");
+                                        if is_chat && !is_unusable {
                                             models.push(id.to_string());
                                         }
                                     }
                                 }
                             }
                         }
-                        models.sort();
                         if models.is_empty() {
                             models = vec![
                                 "gpt-4o".to_string(),
@@ -331,10 +483,24 @@ pub async fn test_provider_key(
                                 "o3-mini".to_string(),
                             ];
                         }
+                        models.sort_by(|a, b| {
+                            let score = |name: &str| -> i32 {
+                                if name == "gpt-4o" { 100 }
+                                else if name == "gpt-4o-mini" { 95 }
+                                else if name.starts_with("o3") { 90 }
+                                else if name.starts_with("o1") { 85 }
+                                else if name.starts_with("chatgpt-4o") { 80 }
+                                else if name.starts_with("gpt-4-turbo") { 75 }
+                                else if name.starts_with("gpt-4") { 70 }
+                                else { 50 }
+                            };
+                            score(b).cmp(&score(a))
+                        });
+                        save_provider_models_to_cache(&state.paths.app_data_dir, "openai", &models).await;
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("OpenAI Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            message: format!("OpenAI Verified ({}, {} models cached)", status.as_u16(), models.len()),
                             models,
                         })
                     } else {
@@ -343,20 +509,32 @@ pub async fn test_provider_key(
                             .ok()
                             .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "openai").await.unwrap_or_default();
                         Ok(TestKeyResponse {
-                            success: false,
+                            success: !cached.is_empty(),
                             latency_ms: latency,
-                            message: error_msg,
-                            models: Vec::new(),
+                            message: if !cached.is_empty() {
+                                format!("{} (Loaded {} cached models)", error_msg, cached.len())
+                            } else {
+                                error_msg
+                            },
+                            models: cached,
                         })
                     }
                 }
-                Err(err) => Ok(TestKeyResponse {
-                    success: false,
-                    latency_ms: start.elapsed().as_millis() as u64,
-                    message: err.to_string(),
-                    models: Vec::new(),
-                }),
+                Err(err) => {
+                    let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "openai").await.unwrap_or_default();
+                    Ok(TestKeyResponse {
+                        success: !cached.is_empty(),
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: if !cached.is_empty() {
+                            format!("{} (Loaded {} cached models)", err, cached.len())
+                        } else {
+                            err.to_string()
+                        },
+                        models: cached,
+                    })
+                }
             }
         }
         "groq" => {
@@ -377,7 +555,8 @@ pub async fn test_provider_key(
                             if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
                                 for item in arr {
                                     if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
-                                        if !id.contains("whisper") {
+                                        let is_active = item.get("active").and_then(|a| a.as_bool()).unwrap_or(true);
+                                        if is_active && !id.contains("whisper") && !id.contains("audio") && !id.contains("embedding") {
                                             models.push(id.to_string());
                                         }
                                     }
@@ -387,13 +566,25 @@ pub async fn test_provider_key(
                         if models.is_empty() {
                             models = vec![
                                 "llama-3.3-70b-versatile".to_string(),
+                                "llama-3.1-8b-instant".to_string(),
                                 "mixtral-8x7b-32768".to_string(),
                             ];
                         }
+                        models.sort_by(|a, b| {
+                            let score = |name: &str| -> i32 {
+                                if name.contains("3.3-70b") { 100 }
+                                else if name.contains("3.1-8b") { 90 }
+                                else if name.contains("distill") { 80 }
+                                else if name.contains("mixtral") { 70 }
+                                else { 50 }
+                            };
+                            score(b).cmp(&score(a))
+                        });
+                        save_provider_models_to_cache(&state.paths.app_data_dir, "groq", &models).await;
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("Groq Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            message: format!("Groq Verified ({}, {} models cached)", status.as_u16(), models.len()),
                             models,
                         })
                     } else {
@@ -402,20 +593,32 @@ pub async fn test_provider_key(
                             .ok()
                             .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "groq").await.unwrap_or_default();
                         Ok(TestKeyResponse {
-                            success: false,
+                            success: !cached.is_empty(),
                             latency_ms: latency,
-                            message: error_msg,
-                            models: Vec::new(),
+                            message: if !cached.is_empty() {
+                                format!("{} (Loaded {} cached models)", error_msg, cached.len())
+                            } else {
+                                error_msg
+                            },
+                            models: cached,
                         })
                     }
                 }
-                Err(err) => Ok(TestKeyResponse {
-                    success: false,
-                    latency_ms: start.elapsed().as_millis() as u64,
-                    message: err.to_string(),
-                    models: Vec::new(),
-                }),
+                Err(err) => {
+                    let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "groq").await.unwrap_or_default();
+                    Ok(TestKeyResponse {
+                        success: !cached.is_empty(),
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: if !cached.is_empty() {
+                            format!("{} (Loaded {} cached models)", err, cached.len())
+                        } else {
+                            err.to_string()
+                        },
+                        models: cached,
+                    })
+                }
             }
         }
         "deepseek" => {
@@ -447,10 +650,11 @@ pub async fn test_provider_key(
                                 "deepseek-reasoner".to_string(),
                             ];
                         }
+                        save_provider_models_to_cache(&state.paths.app_data_dir, "deepseek", &models).await;
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("DeepSeek Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            message: format!("DeepSeek Verified ({}, {} models cached)", status.as_u16(), models.len()),
                             models,
                         })
                     } else {
@@ -459,20 +663,32 @@ pub async fn test_provider_key(
                             .ok()
                             .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "deepseek").await.unwrap_or_default();
                         Ok(TestKeyResponse {
-                            success: false,
+                            success: !cached.is_empty(),
                             latency_ms: latency,
-                            message: error_msg,
-                            models: Vec::new(),
+                            message: if !cached.is_empty() {
+                                format!("{} (Loaded {} cached models)", error_msg, cached.len())
+                            } else {
+                                error_msg
+                            },
+                            models: cached,
                         })
                     }
                 }
-                Err(err) => Ok(TestKeyResponse {
-                    success: false,
-                    latency_ms: start.elapsed().as_millis() as u64,
-                    message: err.to_string(),
-                    models: Vec::new(),
-                }),
+                Err(err) => {
+                    let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "deepseek").await.unwrap_or_default();
+                    Ok(TestKeyResponse {
+                        success: !cached.is_empty(),
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: if !cached.is_empty() {
+                            format!("{} (Loaded {} cached models)", err, cached.len())
+                        } else {
+                            err.to_string()
+                        },
+                        models: cached,
+                    })
+                }
             }
         }
         "xai" => {
@@ -507,10 +723,21 @@ pub async fn test_provider_key(
                                 "grok-beta".to_string(),
                             ];
                         }
+                        models.sort_by(|a, b| {
+                            let score = |name: &str| -> i32 {
+                                if name.starts_with("grok-2-1212") { 100 }
+                                else if name.starts_with("grok-2") { 90 }
+                                else if name.starts_with("grok-3") { 85 }
+                                else if name.starts_with("grok-beta") { 80 }
+                                else { 50 }
+                            };
+                            score(b).cmp(&score(a))
+                        });
+                        save_provider_models_to_cache(&state.paths.app_data_dir, "xai", &models).await;
                         Ok(TestKeyResponse {
                             success: true,
                             latency_ms: latency,
-                            message: format!("xAI Verified ({}, {} models discovered)", status.as_u16(), models.len()),
+                            message: format!("xAI Verified ({}, {} models cached)", status.as_u16(), models.len()),
                             models,
                         })
                     } else {
@@ -519,40 +746,126 @@ pub async fn test_provider_key(
                             .ok()
                             .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+                        let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "xai").await.unwrap_or_default();
                         Ok(TestKeyResponse {
-                            success: false,
+                            success: !cached.is_empty(),
                             latency_ms: latency,
-                            message: error_msg,
-                            models: Vec::new(),
+                            message: if !cached.is_empty() {
+                                format!("{} (Loaded {} cached models)", error_msg, cached.len())
+                            } else {
+                                error_msg
+                            },
+                            models: cached,
                         })
                     }
                 }
-                Err(err) => Ok(TestKeyResponse {
-                    success: false,
-                    latency_ms: start.elapsed().as_millis() as u64,
-                    message: err.to_string(),
-                    models: Vec::new(),
-                }),
+                Err(err) => {
+                    let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "xai").await.unwrap_or_default();
+                    Ok(TestKeyResponse {
+                        success: !cached.is_empty(),
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: if !cached.is_empty() {
+                            format!("{} (Loaded {} cached models)", err, cached.len())
+                        } else {
+                            err.to_string()
+                        },
+                        models: cached,
+                    })
+                }
             }
         }
-        _ => Ok(TestKeyResponse {
-            success: true,
-            latency_ms: 5,
-            message: "Format accepted".to_string(),
-            models: Vec::new(),
-        }),
+        "ollama" => {
+            let endpoint = if clean_key.starts_with("http") {
+                clean_key.to_string()
+            } else {
+                "http://127.0.0.1:11434".to_string()
+            };
+            let url = format!("{}/api/tags", endpoint.trim_end_matches('/'));
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    let status = resp.status();
+                    if status.is_success() {
+                        let body = resp.text().await.unwrap_or_default();
+                        let mut models = Vec::new();
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(arr) = val.get("models").and_then(|m| m.as_array()) {
+                                for item in arr {
+                                    if let Some(name) = item.get("name").and_then(|n| n.as_str()) {
+                                        models.push(name.to_string());
+                                    }
+                                }
+                            }
+                        }
+                        if models.is_empty() {
+                            models = vec!["llama3.2".to_string()];
+                        }
+                        save_provider_models_to_cache(&state.paths.app_data_dir, "ollama", &models).await;
+                        Ok(TestKeyResponse {
+                            success: true,
+                            latency_ms: latency,
+                            message: format!("Ollama Verified ({}, {} models cached)", status.as_u16(), models.len()),
+                            models,
+                        })
+                    } else {
+                        let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "ollama").await.unwrap_or_default();
+                        Ok(TestKeyResponse {
+                            success: !cached.is_empty(),
+                            latency_ms: latency,
+                            message: format!("Ollama HTTP {} (Cached: {})", status.as_u16(), cached.len()),
+                            models: cached,
+                        })
+                    }
+                }
+                Err(err) => {
+                    let cached = read_provider_models_from_cache(&state.paths.app_data_dir, "ollama").await.unwrap_or_default();
+                    Ok(TestKeyResponse {
+                        success: !cached.is_empty(),
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: if !cached.is_empty() {
+                            format!("{} (Loaded {} cached models)", err, cached.len())
+                        } else {
+                            err.to_string()
+                        },
+                        models: cached,
+                    })
+                }
+            }
+        }
+        _ => {
+            let cached = read_provider_models_from_cache(&state.paths.app_data_dir, &provider).await.unwrap_or_default();
+            Ok(TestKeyResponse {
+                success: true,
+                latency_ms: 5,
+                message: format!("Format accepted for {} (Cached: {})", provider, cached.len()),
+                models: cached,
+            })
+        }
     }
 }
-
 
 #[tauri::command]
 pub async fn fetch_provider_models(
     state: State<'_, AppState>,
     provider: String,
 ) -> Result<TestKeyResponse, String> {
+    let is_ollama = provider == "ollama";
     let key = match state.keystore.get_secret(&provider).await {
         Ok(Some(secret)) => secret.to_string(),
         _ => {
+            if is_ollama {
+                return test_provider_key(provider, None, state).await;
+            }
+            if let Some(cached) = read_provider_models_from_cache(&state.paths.app_data_dir, &provider).await {
+                if !cached.is_empty() {
+                    return Ok(TestKeyResponse {
+                        success: true,
+                        latency_ms: 0,
+                        message: format!("Loaded {} cached models for {}", cached.len(), provider),
+                        models: cached,
+                    });
+                }
+            }
             return Ok(TestKeyResponse {
                 success: false,
                 latency_ms: 0,
@@ -561,7 +874,59 @@ pub async fn fetch_provider_models(
             });
         }
     };
-    test_provider_key(provider, Some(key), state).await
+    let mut resp = test_provider_key(provider.clone(), Some(key), state.clone()).await?;
+    if !resp.success || resp.models.is_empty() {
+        if let Some(cached) = read_provider_models_from_cache(&state.paths.app_data_dir, &provider).await {
+            if !cached.is_empty() {
+                resp.success = true;
+                resp.message = format!("Loaded {} cached models for {} (Offline fallback)", cached.len(), provider);
+                resp.models = cached;
+            }
+        }
+    }
+    Ok(resp)
+}
+
+#[tauri::command]
+pub async fn get_cached_models(
+    state: State<'_, AppState>,
+) -> Result<HashMap<String, Vec<String>>, String> {
+    Ok(read_all_models_from_cache(&state.paths.app_data_dir).await)
+}
+
+#[tauri::command]
+pub async fn fetch_all_provider_models(
+    state: State<'_, AppState>,
+) -> Result<HashMap<String, Vec<String>>, String> {
+    let providers = ["gemini", "anthropic", "openai", "deepseek", "groq", "xai"];
+    let mut map = HashMap::new();
+
+    for &p in &providers {
+        if let Ok(Some(secret)) = state.keystore.get_secret(p).await {
+            let key = secret.to_string();
+            if !key.trim().is_empty() {
+                if let Ok(res) = test_provider_key(p.to_string(), Some(key), state.clone()).await {
+                    if !res.models.is_empty() {
+                        map.insert(p.to_string(), res.models);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Ok(res) = test_provider_key("ollama".to_string(), None, state.clone()).await {
+        if !res.models.is_empty() {
+            map.insert("ollama".to_string(), res.models);
+        }
+    }
+
+    // Merge with any cached models that were not refreshed
+    let cached = read_all_models_from_cache(&state.paths.app_data_dir).await;
+    for (k, v) in cached {
+        map.entry(k).or_insert(v);
+    }
+
+    Ok(map)
 }
 
 #[tauri::command]

@@ -146,11 +146,11 @@ export function MessageItem({ message }: MessageItemProps) {
 
   // AI response: Responds directly to the flat back of the screen
   return (
-    <div className="flex flex-col justify-start my-4 w-full group select-text">
+    <div className="flex flex-col justify-start my-4 w-full max-w-full min-w-0 group select-text">
       {message.reasoning && <ThinkingBlock reasoning={message.reasoning} />}
 
       {message.content ? (
-        <div className="markdown-content text-[#c9d1d9] text-xs md:text-sm leading-relaxed max-w-none break-words">
+        <div className="markdown-content text-[#c9d1d9] text-xs md:text-sm leading-relaxed w-full max-w-full min-w-0 break-words">
           <Markdown
             remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[rehypeKatex]}
@@ -276,7 +276,7 @@ export function MessageItem({ message }: MessageItemProps) {
 
                 if (!isInline && lang === "mermaid") {
                   return (
-                    <div className="my-3 w-full">
+                    <div className="my-3 w-full max-w-full min-w-0 overflow-hidden">
                       <MermaidViewer code={codeString} />
                     </div>
                   );

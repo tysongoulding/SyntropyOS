@@ -150,6 +150,7 @@ const STORAGE_KEYS = {
   PROVIDERS: "rho_lota_providers_vault_v1",
   PREAMBLES: "rho_lota_preambles_v1",
   ACTIVE_SELECTION: "rho_lota_active_selection_v1",
+  MODELS_CACHE: "rho_lota_models_cache_v1",
 };
 
 const DEPRECATED_MODELS = new Set([
@@ -170,24 +171,32 @@ export function isDeprecatedModel(model?: string): boolean {
 
 const loadInitialProviders = (): Record<string, ProviderConfig> => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Record<string, Partial<ProviderConfig>>;
-      const result: Record<string, ProviderConfig> = { ...DEFAULT_PROVIDERS };
-      for (const [key, defaultProv] of Object.entries(DEFAULT_PROVIDERS)) {
-        if (parsed[key]) {
-          const userModels = Array.isArray(parsed[key].models) && parsed[key].models!.length > 0
-            ? parsed[key].models!.filter((m: string) => !isDeprecatedModel(m))
-            : defaultProv.models;
-          result[key] = {
-            ...defaultProv,
-            ...parsed[key],
-            models: userModels.length > 0 ? userModels : defaultProv.models,
-          };
-        }
+    let cachedMap: Record<string, string[]> = {};
+    try {
+      const rawCache = localStorage.getItem(STORAGE_KEYS.MODELS_CACHE);
+      if (rawCache) {
+        cachedMap = JSON.parse(rawCache);
       }
-      return result;
+    } catch {}
+
+    const raw = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, Partial<ProviderConfig>>) : {};
+    const result: Record<string, ProviderConfig> = { ...DEFAULT_PROVIDERS };
+    for (const [key, defaultProv] of Object.entries(DEFAULT_PROVIDERS)) {
+      const provParsed = parsed[key] || {};
+      const cachedModels = cachedMap[key];
+      const candidateModels = Array.isArray(provParsed.models) && provParsed.models.length > 0
+        ? provParsed.models
+        : (Array.isArray(cachedModels) && cachedModels.length > 0 ? cachedModels : defaultProv.models);
+      const cleanModels = candidateModels.filter((m: string) => !isDeprecatedModel(m));
+
+      result[key] = {
+        ...defaultProv,
+        ...provParsed,
+        models: cleanModels.length > 0 ? cleanModels : defaultProv.models,
+      };
     }
+    return result;
   } catch {}
   return DEFAULT_PROVIDERS;
 };
@@ -229,8 +238,10 @@ export interface ProviderState {
   setThinkingLevel: (level: ThinkingLevel) => void;
   syncKeysToBackend: () => Promise<void>;
   loadKeysFromSharedAuthFile: () => Promise<void>;
+  loadCachedModelsFromBackend: () => Promise<Record<string, string[]>>;
   testProviderKeyLive: (providerId: string, key: string) => Promise<{ success: boolean; message: string; latency?: number; models?: string[] }>;
   fetchProviderModels: (providerId: string) => Promise<string[]>;
+  fetchAllProviderModels: () => Promise<Record<string, string[]>>;
   startOAuthLogin: (providerId: string, customClientId?: string) => Promise<{ success: boolean; message: string }>;
   checkOllama: () => Promise<void>;
   savePreamble: (preset: PreamblePreset) => void;
@@ -339,6 +350,46 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
         console.warn("Failed to load shared auth keys:", err);
       }
     }
+  },
+
+  loadCachedModelsFromBackend: async () => {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const cached = await invoke<Record<string, string[]>>("get_cached_models");
+        if (cached && Object.keys(cached).length > 0) {
+          set((state) => {
+            const updated = { ...state.providers };
+            let changed = false;
+            for (const [provId, models] of Object.entries(cached)) {
+              if (updated[provId] && Array.isArray(models) && models.length > 0) {
+                const cleanModels = models.filter((m) => !isDeprecatedModel(m));
+                if (cleanModels.length > 0) {
+                  updated[provId] = {
+                    ...updated[provId],
+                    models: cleanModels,
+                    isConfigured: true,
+                  };
+                  changed = true;
+                }
+              }
+            }
+            if (changed) {
+              try {
+                localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+                localStorage.setItem(STORAGE_KEYS.MODELS_CACHE, JSON.stringify(cached));
+              } catch {}
+              return { providers: updated };
+            }
+            return state;
+          });
+          return cached;
+        }
+      } catch (err) {
+        console.warn("Failed to load cached models from backend:", err);
+      }
+    }
+    return {};
   },
 
   testProviderKeyLive: async (providerId: string, key: string) => {
@@ -492,7 +543,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
           const { invoke } = await import("@tauri-apps/api/core");
           const res = await invoke<TestKeyResponse>("fetch_provider_models", { provider: providerId });
           if (res.success && res.models && res.models.length > 0) {
-            const discovered = res.models;
+            const discovered = res.models.filter((m) => !isDeprecatedModel(m));
             set((state) => {
               const current = state.providers[providerId];
               if (!current) return state;
@@ -500,17 +551,21 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
                 ...state.providers,
                 [providerId]: {
                   ...current,
-                  models: discovered,
+                  models: discovered.length > 0 ? discovered : current.models,
                   isConfigured: true,
                 },
               };
               try {
                 localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+                const cacheRaw = localStorage.getItem(STORAGE_KEYS.MODELS_CACHE);
+                const cacheMap = cacheRaw ? JSON.parse(cacheRaw) : {};
+                cacheMap[providerId] = discovered;
+                localStorage.setItem(STORAGE_KEYS.MODELS_CACHE, JSON.stringify(cacheMap));
               } catch {}
 
               const shouldFallback = state.activeProviderId === providerId && !discovered.includes(state.activeModel);
               const fallbackModel = shouldFallback
-                ? (discovered.includes(current.defaultModel) ? current.defaultModel : discovered[0])
+                ? (discovered.includes(current.defaultModel) ? current.defaultModel : (discovered[0] || "gemini-2.5-flash"))
                 : state.activeModel;
 
               if (fallbackModel !== state.activeModel) {
@@ -548,6 +603,44 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
         isSyncing: { ...state.isSyncing, [providerId]: false },
       }));
     }
+  },
+
+  fetchAllProviderModels: async () => {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const results = await invoke<Record<string, string[]>>("fetch_all_provider_models");
+        if (results && Object.keys(results).length > 0) {
+          set((state) => {
+            const updated = { ...state.providers };
+            const now = Date.now();
+            const newSync: Record<string, number> = { ...state.lastSyncedAt };
+            for (const [provId, models] of Object.entries(results)) {
+              if (updated[provId] && Array.isArray(models) && models.length > 0) {
+                const cleanModels = models.filter((m) => !isDeprecatedModel(m));
+                if (cleanModels.length > 0) {
+                  updated[provId] = {
+                    ...updated[provId],
+                    models: cleanModels,
+                    isConfigured: true,
+                  };
+                  newSync[provId] = now;
+                }
+              }
+            }
+            try {
+              localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(updated));
+              localStorage.setItem(STORAGE_KEYS.MODELS_CACHE, JSON.stringify(results));
+            } catch {}
+            return { providers: updated, lastSyncedAt: newSync };
+          });
+          return results;
+        }
+      } catch (err) {
+        console.warn("fetch_all_provider_models failed:", err);
+      }
+    }
+    return {};
   },
 
   startOAuthLogin: async (providerId: string, customClientId?: string) => {

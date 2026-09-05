@@ -35,6 +35,7 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
       startOnLoad: false,
       theme: "dark",
       securityLevel: "loose",
+      suppressErrorRendering: true,
       themeVariables: {
         darkMode: true,
         background: "#0d1117",
@@ -49,26 +50,64 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
     });
 
     let isMounted = true;
-    const renderDiagram = async () => {
+    const timer = setTimeout(async () => {
+      if (!cleanCode || !isMounted) return;
+
+      // Pre-validate syntax to prevent Mermaid from corrupting the DOM during streaming
+      try {
+        const isValid = await mermaid.parse(cleanCode, { suppressErrors: true });
+        if (isValid === false) return;
+      } catch {
+        return;
+      }
+
+      const id = `mermaid-svg-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       try {
         setError(null);
-        if (!cleanCode) return;
-        const id = `mermaid-svg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
         const { svg } = await mermaid.render(id, cleanCode);
         if (isMounted) {
-          setSvgContent(svg);
+          // Force SVG to stay strictly within container bounds without duplicate or overriding attributes
+          const responsiveSvg = svg.replace(/<svg\b([^>]*)>/i, (_match, attrs) => {
+            let cleanAttrs = attrs;
+            let viewBox = "";
+            const viewBoxMatch = cleanAttrs.match(/viewBox="([^"]+)"/i);
+            if (viewBoxMatch) {
+              viewBox = viewBoxMatch[1];
+            } else {
+              const wMatch = cleanAttrs.match(/width="([^"]+)"/i);
+              const hMatch = cleanAttrs.match(/height="([^"]+)"/i);
+              if (wMatch && hMatch) {
+                viewBox = `0 0 ${parseFloat(wMatch[1])} ${parseFloat(hMatch[1])}`;
+              }
+            }
+
+            // Strip out existing width, height, viewBox, and style attributes so our responsive attributes are authoritative
+            cleanAttrs = cleanAttrs
+              .replace(/\s*style="[^"]*"/gi, "")
+              .replace(/\s*width="[^"]*"/gi, "")
+              .replace(/\s*height="[^"]*"/gi, "")
+              .replace(/\s*viewBox="[^"]*"/gi, "");
+
+            const viewBoxAttr = viewBox ? `viewBox="${viewBox}"` : "";
+            return `<svg ${cleanAttrs} ${viewBoxAttr} width="100%" style="max-width: 100% !important; height: auto !important; width: 100% !important; display: block; margin: 0 auto;">`;
+          });
+          setSvgContent(responsiveSvg);
         }
       } catch (err: unknown) {
         if (isMounted) {
           setError(err instanceof Error ? err.message : String(err));
         }
+      } finally {
+        const leftover = document.getElementById(`d${id}`);
+        if (leftover) leftover.remove();
+        const tempSvg = document.getElementById(id);
+        if (tempSvg && tempSvg.parentElement === document.body) tempSvg.remove();
       }
-    };
-
-    renderDiagram();
+    }, 200);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [cleanCode]);
 
@@ -84,7 +123,7 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
   };
 
   return (
-    <div className="flex flex-col w-full bg-[#0d1117] rounded-xl border border-[#30363d] overflow-hidden select-none my-3 shadow-xs">
+    <div className="flex flex-col w-full max-w-full min-w-0 bg-[#0d1117] rounded-xl border border-[#30363d] overflow-hidden select-none my-3 shadow-xs">
       {/* Diagram Action Bar */}
       <div className="flex items-center justify-between px-3.5 py-2 bg-[#161b22] border-b border-[#30363d] text-xs">
         <div className="flex items-center space-x-2">
@@ -127,7 +166,7 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
             <div className="flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-0.5 space-x-0.5">
               <button
                 type="button"
-                onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))}
+                onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))}
                 className="p-1 rounded hover:bg-[#21262d] text-[#8b949e] hover:text-white transition"
                 title="Zoom Out"
               >
@@ -138,7 +177,7 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
               </span>
               <button
                 type="button"
-                onClick={() => setZoom((z) => Math.min(2.5, z + 0.15))}
+                onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.15).toFixed(2))))}
                 className="p-1 rounded hover:bg-[#21262d] text-[#8b949e] hover:text-white transition"
                 title="Zoom In"
               >
@@ -174,16 +213,16 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
       {/* Content Area */}
       <div
         ref={containerRef}
-        className="overflow-auto p-4 flex items-center justify-center min-h-[160px] max-h-[560px] bg-[#0d1117]"
+        className="w-full max-w-full min-w-0 overflow-x-auto overflow-y-auto p-4 min-h-[160px] max-h-[560px] bg-[#0d1117]"
       >
         {viewMode === "code" ? (
-          <div className="w-full">
+          <div className="w-full max-w-full min-w-0">
             <pre className="text-[#c9d1d9] font-mono text-xs p-3 rounded-lg bg-[#161b22] border border-[#30363d] overflow-x-auto whitespace-pre select-text">
               {cleanCode}
             </pre>
           </div>
         ) : error ? (
-          <div className="p-3.5 bg-amber-950/20 border border-amber-900/40 rounded-xl text-amber-200 w-full space-y-2 text-xs select-text">
+          <div className="p-3.5 bg-amber-950/20 border border-amber-900/40 rounded-xl text-amber-200 w-full max-w-full min-w-0 space-y-2 text-xs select-text">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 font-medium">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
@@ -197,23 +236,27 @@ export function MermaidViewer({ code }: MermaidViewerProps) {
                 View Source Code
               </button>
             </div>
-            <pre className="text-[11px] font-mono whitespace-pre-wrap text-[#8b949e] bg-[#161b22] p-2.5 rounded-lg border border-[#30363d]">
+            <pre className="text-[11px] font-mono whitespace-pre-wrap text-[#8b949e] bg-[#161b22] p-2.5 rounded-lg border border-[#30363d] overflow-x-auto">
               {cleanCode}
             </pre>
           </div>
         ) : svgContent ? (
-          <div
-            style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: "center center",
-              transition: "transform 0.15s ease-out",
-            }}
-            dangerouslySetInnerHTML={{ __html: svgContent }}
-            className="flex items-center justify-center [&>svg]:max-w-full [&>svg]:h-auto"
-          />
+          <div className="w-full min-w-0 flex items-center justify-center">
+            <div
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: "center center",
+                transition: "transform 0.15s ease-out",
+              }}
+              dangerouslySetInnerHTML={{ __html: svgContent }}
+              className="w-full max-w-full flex items-center justify-center min-w-0 [&>svg]:max-w-full [&>svg]:w-full [&>svg]:h-auto"
+            />
+          </div>
         ) : (
-          <div className="text-[#8b949e] text-xs font-mono animate-pulse py-6">
-            Rendering vector diagram...
+          <div className="flex items-center justify-center py-6">
+            <span className="text-[#8b949e] text-xs font-mono animate-pulse">
+              Rendering vector diagram...
+            </span>
           </div>
         )}
       </div>

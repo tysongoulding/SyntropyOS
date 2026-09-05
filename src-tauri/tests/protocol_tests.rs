@@ -97,3 +97,25 @@ async fn test_oauth_port_range_binding() {
     drop(listener);
 }
 
+#[tokio::test]
+async fn test_models_cache_read_write() {
+    let temp_dir = std::env::temp_dir().join(format!("syntropy_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+    let _ = tokio::fs::create_dir_all(&temp_dir).await;
+
+    let models = vec!["gemini-2.5-flash".to_string(), "gemini-3.1-pro-preview".to_string()];
+    syntropy_os_lib::commands::save_provider_models_to_cache(&temp_dir, "gemini", &models).await;
+
+    let cached = syntropy_os_lib::commands::read_provider_models_from_cache(&temp_dir, "gemini").await;
+    assert!(cached.is_some());
+    let cached_models = cached.unwrap();
+    assert_eq!(cached_models.len(), 2);
+    assert_eq!(cached_models[0], "gemini-2.5-flash");
+
+    let all = syntropy_os_lib::commands::read_all_models_from_cache(&temp_dir).await;
+    assert!(all.contains_key("gemini"));
+    assert_eq!(all["gemini"].len(), 2);
+
+    let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+}
+
+
