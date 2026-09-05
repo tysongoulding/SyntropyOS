@@ -35,7 +35,8 @@ impl SecureKeystore {
     pub async fn set_secret(&self, key: &str, secret: &str) -> Result<(), KeystoreError> {
         let zeroized = Zeroizing::new(secret.to_string());
 
-        // Attempt keyring storage
+        // Attempt keyring storage on desktop platforms
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, key) {
             let _ = entry.set_password(secret);
         }
@@ -57,7 +58,8 @@ impl SecureKeystore {
             }
         }
 
-        // Attempt retrieval from keyring
+        // Attempt retrieval from keyring on desktop platforms
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, key) {
             if let Ok(secret) = entry.get_password() {
                 let zeroized = Zeroizing::new(secret);
@@ -71,6 +73,7 @@ impl SecureKeystore {
     }
 
     pub async fn delete_secret(&self, key: &str) -> Result<(), KeystoreError> {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, key) {
             let _ = entry.delete_credential();
         }
