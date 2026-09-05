@@ -1,11 +1,12 @@
 import { useWorkspaceStore, FileNode } from "../../store/workspaceStore";
-import { Sparkles, Terminal, FileCode } from "lucide-react";
+import { useSubagentStore } from "../../store/subagentStore";
+import { Sparkles, Terminal, FileCode, Bot } from "lucide-react";
 
 export interface AutocompleteItem {
   key: string;
   label: string;
   description: string;
-  type: "skill" | "command" | "file";
+  type: "skill" | "command" | "file" | "agent";
 }
 
 const STATIC_SUGGESTIONS: AutocompleteItem[] = [
@@ -42,8 +43,17 @@ interface AutocompleteMenuProps {
 
 export function AutocompleteMenu({ filter, onSelect }: AutocompleteMenuProps) {
   const { files } = useWorkspaceStore();
+  const { subagents } = useSubagentStore();
+
+  const agentSuggestions: AutocompleteItem[] = subagents.map((a) => ({
+    key: `@${a.name}`,
+    label: `@${a.name}`,
+    description: `${a.role} • ${a.model}`,
+    type: "agent",
+  }));
+
   const fileSuggestions = flattenFileNodes(files);
-  const allSuggestions = [...STATIC_SUGGESTIONS, ...fileSuggestions];
+  const allSuggestions = [...agentSuggestions, ...STATIC_SUGGESTIONS, ...fileSuggestions];
 
   const matches = allSuggestions.filter((s) =>
     s.key.toLowerCase().startsWith(filter.toLowerCase())
@@ -54,7 +64,7 @@ export function AutocompleteMenu({ filter, onSelect }: AutocompleteMenuProps) {
   return (
     <div className="absolute bottom-full left-4 mb-2 w-80 bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl overflow-hidden text-xs z-50">
       <div className="p-2 bg-[#0d1117] text-[10px] uppercase font-semibold text-[#8b949e] border-b border-[#30363d] flex items-center justify-between">
-        <span>Context Autocomplete</span>
+        <span>Context & Agent Autocomplete</span>
         <span>{matches.length} matches</span>
       </div>
       <div className="max-h-56 overflow-y-auto p-1 space-y-0.5 font-mono">
@@ -65,10 +75,12 @@ export function AutocompleteMenu({ filter, onSelect }: AutocompleteMenuProps) {
             className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[#21262d] text-left transition"
           >
             <div className="flex items-center space-x-2 truncate">
-              {item.type === "skill" ? (
+              {item.type === "agent" ? (
+                <Bot className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+              ) : item.type === "skill" ? (
                 <Sparkles className="w-3.5 h-3.5 text-[#58a6ff] flex-shrink-0" />
               ) : item.type === "file" ? (
-                <FileCode className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                <FileCode className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               ) : (
                 <Terminal className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
               )}

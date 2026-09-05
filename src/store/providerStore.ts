@@ -46,17 +46,22 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
     id: "gemini",
     name: "Google Gemini",
     type: "api_key",
-    defaultModel: "gemini-2.0-flash",
+    defaultModel: "gemini-3.8-flash",
     models: [
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-pro",
+      "gemini-3-pro",
+      "gemini-2.5-flash",
       "gemini-2.0-flash",
       "gemini-2.0-flash-lite",
       "gemini-2.0-flash-thinking-exp-01-21",
-      "gemini-2.0-flash-thinking-exp",
       "gemini-2.0-pro-exp-02-05",
       "gemini-1.5-flash",
       "gemini-1.5-flash-8b",
       "gemini-1.5-pro",
-      "gemini-exp-1206",
       "gemma-2-27b-it",
       "gemma-2-9b-it",
       "gemma-2-2b-it",
@@ -166,10 +171,10 @@ export function isDeprecatedModel(model?: string): boolean {
   const m = model.toLowerCase();
   return (
     DEPRECATED_MODELS.has(m) ||
-    m.includes("2.5") ||
-    m.includes("3.") ||
     m.includes("1.0") ||
-    m.includes("bison")
+    m.includes("bison") ||
+    m === "gemini-pro" ||
+    m === "gemini-pro-vision"
   );
 }
 

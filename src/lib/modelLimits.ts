@@ -8,19 +8,26 @@ export function getModelContextLimit(modelName?: string, providerId?: string): M
   const cleanModel = (modelName || "").toLowerCase();
 
   // Google Gemini Family
-  if (cleanModel.includes("gemini-1.5-pro") || cleanModel.includes("gemini-pro")) {
-    return { maxTokens: 2097152, displayName: modelName || "gemini-1.5-pro", providerName: "Google Gemini" };
+  if (
+    cleanModel.includes("3.1-pro") ||
+    cleanModel.includes("3-pro") ||
+    cleanModel.includes("2.0-pro") ||
+    cleanModel.includes("gemini-1.5-pro") ||
+    cleanModel.includes("gemini-pro")
+  ) {
+    return { maxTokens: 2097152, displayName: modelName || "gemini-3.1-pro", providerName: "Google Gemini" };
   }
   if (
     cleanModel.includes("gemini-1.5-flash") ||
     cleanModel.includes("gemini-flash") ||
     cleanModel.includes("gemini-2.0") ||
+    cleanModel.includes("gemini-2.5") ||
     cleanModel.includes("gemini-3.")
   ) {
-    return { maxTokens: 1048576, displayName: modelName || "gemini-flash-latest", providerName: "Google Gemini" };
+    return { maxTokens: 1048576, displayName: modelName || "gemini-3.8-flash", providerName: "Google Gemini" };
   }
   if (cleanModel.includes("flash-lite") || cleanModel.includes("gemma")) {
-    return { maxTokens: 1048576, displayName: modelName || "gemini-flash-lite-latest", providerName: "Google Gemini" };
+    return { maxTokens: 1048576, displayName: modelName || "gemini-flash-lite", providerName: "Google Gemini" };
   }
 
   // Anthropic Claude Family
@@ -76,6 +83,13 @@ export function getModelContextLimit(modelName?: string, providerId?: string): M
   };
 }
 
+export function formatContextLimit(tokens: number): string {
+  if (tokens >= 2000000) return "2M";
+  if (tokens >= 1000000) return "1M";
+  if (tokens >= 1000) return `${Math.round(tokens / 1000)}k`;
+  return `${tokens}`;
+}
+
 export function supportsThinking(modelName?: string, providerId?: string): boolean {
   if (!modelName) return false;
   const clean = modelName.toLowerCase();
@@ -83,7 +97,10 @@ export function supportsThinking(modelName?: string, providerId?: string): boole
   // Gemini thinking models
   if (
     clean.includes("2.0-flash-thinking") ||
-    clean.includes("thinking")
+    clean.includes("thinking") ||
+    clean.includes("3.8") ||
+    clean.includes("3.7") ||
+    clean.includes("3.1")
   ) {
     return true;
   }

@@ -167,9 +167,7 @@ pub async fn read_all_models_from_cache(
 
 fn is_deprecated_gemini_model(model: &str) -> bool {
     let m = model.to_lowercase();
-    m.contains("2.5")
-        || m.contains("3.")
-        || m.contains("1.0")
+    m.contains("1.0")
         || m.contains("bison")
         || m.contains("aqa")
         || m.contains("embedding")

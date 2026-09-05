@@ -10,6 +10,7 @@ import { AutocompleteMenu } from "./AutocompleteMenu";
 import { ContextRingGauge } from "./ContextRingGauge";
 import { ContextWindowModal } from "../modals/ContextWindowModal";
 import { AddContextDropup } from "./AddContextDropup";
+import { AgentDropupPicker } from "./AgentDropupPicker";
 import { ModelDropupPicker } from "./ModelDropupPicker";
 import {
   Send,
@@ -179,6 +180,8 @@ export function PromptInput({ placeholder }: PromptInputProps = {}) {
               onInsertMention={handleInsertChar}
               onOpenBrowserTool={handleOpenBrowserTool}
             />
+
+            <AgentDropupPicker />
 
             <ModelDropupPicker />
 
